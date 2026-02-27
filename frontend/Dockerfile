@@ -1,5 +1,5 @@
 # Choose the version of node we use.
-FROM node:lts-alpine as build
+FROM node:lts-alpine AS build
 
 # Choose a working directory.
 WORKDIR /app
