@@ -17,6 +17,18 @@ app.get('/api/hello', (req: Request, res: Response) => {
   res.json({ message: 'Hello from Express backend!' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+
+// Handle shutdowns
+const shutdown = () => {
+  console.log('Received shutdown signal, closing server...');
+  server.close(() => {
+    console.log('Server closed. Exiting process.');
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
