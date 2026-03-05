@@ -21,3 +21,10 @@ To locally run in project directory:
 To locally stop run in project directory:
 - `.\tools\docker-compose-tools.bat down`
 
+# How to Login to Adminer
+Enter these values into the fields:
+System: MySQL / MariaDB
+Server: db
+Username: user1
+Password: USER_PASSWORD in .env
+Database: database to enter (optional)

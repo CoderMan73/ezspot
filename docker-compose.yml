@@ -15,14 +15,14 @@ services:
     environment:
       PORT: 3000
       DB_HOST: database
-      DB_NAME: test-db
+      DB_NAME: db
       DB_USERNAME: user1
       DB_PASSWORD: ${USER_PASSWORD}
     depends_on:
-      - db
+      - database
   
   # MySql
-  db:
+  database:
     image: mysql:8.4
     container_name: ezspot-db
     restart: always
@@ -44,7 +44,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - db
+      - database
 
 volumes:
   db-data:
