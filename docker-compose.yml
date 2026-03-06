@@ -1,0 +1,50 @@
+services:
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # Backend
+  backend:
+    build: ./backend
+    ports:
+      - "5000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: database
+      DB_NAME: db
+      DB_USERNAME: user1
+      DB_PASSWORD: ${USER_PASSWORD}
+    depends_on:
+      - database
+  
+  # MySql
+  database:
+    image: mysql:8.4
+    container_name: ezspot-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: db
+      MYSQL_ROOT_PASSWORD: ${ROOT_PASSWORD}
+      MYSQL_USER: user1
+      MYSQL_PASSWORD: ${USER_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+
+  # Adminer
+  adminer:
+    image: adminer
+    container_name: ezspot-adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - database
+
+volumes:
+  db-data:
