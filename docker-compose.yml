@@ -14,9 +14,9 @@ services:
       - "5000:3000"
     environment:
       PORT: 3000
-      DB_HOST: database
-      DB_NAME: db
-      DB_USERNAME: user1
+      DB_HOST: ${DB_HOST}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
       DB_PASSWORD: ${USER_PASSWORD}
     depends_on:
       - database
@@ -24,12 +24,11 @@ services:
   # MySql
   database:
     image: mysql:8.4
-    container_name: ezspot-db
     restart: always
     environment:
-      MYSQL_DATABASE: db
+      MYSQL_DATABASE: ${DB_NAME}
       MYSQL_ROOT_PASSWORD: ${ROOT_PASSWORD}
-      MYSQL_USER: user1
+      MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${USER_PASSWORD}
     ports:
       - "3306:3306"
@@ -39,7 +38,6 @@ services:
   # Adminer
   adminer:
     image: adminer
-    container_name: ezspot-adminer
     restart: always
     ports:
       - "8080:8080"

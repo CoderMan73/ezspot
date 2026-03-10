@@ -1,5 +1,6 @@
 // server/server.ts
 import express, { Request, Response } from 'express';
+import { pool, waitForDatabase } from "./db/connection";
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -21,18 +22,39 @@ app.get('/api/hello', (req: Request, res: Response) => {
   res.json({ message: 'Hello from Express backend!' });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+app.get('/api/health/db', async (req: Request, res: Response) =>{
+  try {
+    const [rows] = await pool.query("SELECT 1");
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ ok: false });
+  }
 });
 
-// Handle shutdowns
-const shutdown = () => {
-  console.log('Received shutdown signal, closing server...');
-  server.close(() => {
-    console.log('Server closed. Exiting process.');
-    process.exit(0);
-  });
-};
+// function to handle server startup
+async function startServer() {
+  try {
+    // wait for the database before the server is ran
+    await waitForDatabase();
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+    const server = app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+    // handle shutdown
+    const shutdown = () => {
+      console.log("Received shutdown signal, closing server...");
+      server.close(() => {
+        process.exit(0);
+      });
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+
+  } catch (err) {
+    console.error("Startup failed:", err);
+    process.exit(1);
+  }
+}
+
+startServer();
