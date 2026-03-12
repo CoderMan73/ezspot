@@ -1,6 +1,26 @@
 import pdfplumber as pp
 import sys
 import json
+import os
+import mysql.connector
+
+
+
+def connection_setup():
+    # get env vars
+    host = os.getenv("DB_HOST")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
+    database = os.getenv("DB_NAME")
+    # create connection
+    conn = mysql.connector.connect(
+    host=host,
+    user=user,
+    password=password,
+    database=database
+    )
+
+    return conn, conn.cursor()
 
 
 def build_report_data(filename: str, semester: str, year: int, user_pid: str) -> dict:
@@ -69,6 +89,10 @@ def parse_pdf(pdf_path: str) -> list:
                 
                 # split into first and last
                 last, first = name_string.split(",", 1)
+                # skip empty first or last names
+                if (first == '' or last == ''):
+                    continue
+
                 first = first.strip()
                 last = last.strip()
 
@@ -195,30 +219,123 @@ def process_report(pdf_path: str, report_data: dict) -> tuple[list, list]:
     return rows, stat_rows
 
 
+# Returns exit code  
+def insert_spot_rows(spot_rows: list, report_id: int,  year: int,  semester: str, cursor) -> bool:
+    # handle no given spot rows
+    if (spot_rows is None):
+        return 1
+    # create querey
+    query = """
+    INSERT INTO spot_rows
+    (report_id, first_name, last_name, instr_classification, instr_rank, crn, students_enrolled, instr_rating_mean, semester, year)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    # create values list from spot_rows
+    values_list = []
+    for row in spot_rows:
+        values_list.append((
+            report_id,
+            row["first_name"],
+            row["last_name"],
+            row["instr_classification"],
+            row["instr_rank"],
+            row["crn"],
+            row["students_enrolled"],
+            row["instr_rating_mean"],
+            semester,
+            year
+
+        ))
+    # execute the queries with the values
+    cursor.executemany(query, values_list)
+    return 0
+
+
+# Returns exit code 
+def insert_stat_rows(stat_rows: list, report_id: int, cursor) -> bool:
+    # handle no given spot rows
+    if (stat_rows is None):
+        return 1
+    # create querey
+    query = """
+    INSERT INTO statistics
+    (report_id, semester, year, rating, instr_first_name, instr_last_name)
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """
+    # create values list from spot_rows
+    values_list = []
+    for row in stat_rows:
+        values_list.append((
+            report_id,
+            row['semester'],
+            row["year"],
+            row['rating'],
+            row['first_name'],
+            row['last_name']
+        ))
+    # execute the queries with the values
+    cursor.executemany(query, values_list)
+    return 0
+    
+def update_report_status(report_id: int, status: str, curr):
+    query = """
+    UPDATE report_upload SET processing_status = %s WHERE report_id = %s;
+    """
+    curr.execute(query, [status, report_id])
+    
+   
+
+
 def main():
-    if len(sys.argv) != 6:
-        print("Usage: script pdf_path semester year user_pid filename", file=sys.stderr)
+    # handle arg count
+    if len(sys.argv) != 7:
+        print("Usage: script pdf_path semester year user_pid filename report_id", file=sys.stderr)
         sys.exit(2)
 
+    # create db connection and get args
+    conn, curr = connection_setup()
     pdf_path = sys.argv[1]
     semester = sys.argv[2]
     year = int(sys.argv[3])
     user_pid = sys.argv[4]
     filename = sys.argv[5]
+    report_id = int(sys.argv[6])
 
+    # create the report data, spot_rows, and stat_rows
     report_data = build_report_data(filename, semester, year, user_pid)
     rows, stat_rows = process_report(pdf_path, report_data)
 
-    result = {
-        "success": True,
-        "report_data": report_data,
-        "parsed_rows": rows,
-        "parsed_stats": stat_rows,
-        "rows_parsed": len(rows),
-        "stats_built": len(stat_rows)
-    }
+    # create SQL transaction for inserting the bulk data
+    try:
+        exit_code = insert_spot_rows(rows, report_id, year, semester, curr)
+        exit_code_stat = insert_stat_rows(stat_rows, report_id, curr)
+        # update the report with the completed sign
+        if (exit_code == 0 and exit_code_stat == 0):
+            update_report_status(report_id, 'Processed', curr)
+        conn.commit()
+        # print result 
+        result = {
+            "success": True,
+            "report_id": report_id,
+            "rows_parsed": len(rows),
+            "stats_built": len(stat_rows),
+            "spot_exit_code": exit_code,
+            "stat_exit_code": exit_code_stat
+        }
 
-    print(json.dumps(result))
+        print(json.dumps(result))
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Database error: {e}", file=sys.stderr)
+        update_report_status(report_id, 'Failed', curr)
+        conn.commit()
+        sys.exit(1)
+    finally:
+        curr.close()
+        conn.close()
+
+    
 
 if __name__ == "__main__":
     try:

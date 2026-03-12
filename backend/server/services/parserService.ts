@@ -1,6 +1,4 @@
 import { spawn } from 'child_process'
-import { Response } from 'express'
-
 
 // define a type for the args
 type ParserJobArgs = {
@@ -16,15 +14,7 @@ type ParserJobArgs = {
 // begins the parsing of the input file
 export function startParserJob(args: ParserJobArgs) {
     // create the args given to the python process
-    const pythonArgs = [
-        args.parserPath,
-        args.pdfPath,
-        args.semester,
-        args.year,
-        args.userPid,
-        args.originalName,
-       // String(args.reportId)
-    ]
+    const pythonArgs = [args.parserPath, args.pdfPath, args.semester, args.year, args.userPid, args.originalName, String(args.reportId)]
 
     // call the python process
     const pythonProcess = spawn("python", pythonArgs)
@@ -43,40 +33,37 @@ export function startParserJob(args: ParserJobArgs) {
         console.error("Error in Python script:", err)
     })
 
-    pythonProcess.on("close", async (code) => {
-        await handleParserCompletion(code, stdoutData, stderrData, args.reportId)
+    pythonProcess.on("close", (code) => {
+        handleParserCompletion(code, stdoutData, stderrData, args.reportId)
     })
 }
 
-export async function handleParserCompletion(code: number | null, stdoutData: string, stderrData: string, reportId: number) {
+export function handleParserCompletion(code: number | null, stdoutData: string, stderrData: string, reportId: number) {
     // handle exit code
     if (code !== 0) {
-        console.error("Error closing Python script.")
-        console.error("exit code:", code)
-        console.error("stderr:", stderrData)
-
-        // NEED TO ADD HERE
-        // update report_upload set processing_status = 'Failed'
+        console.error(`[report ${reportId}] parser process failed (exit code ${code})`)
+        if (stderrData.trim()) {
+            console.error(stderrData.trim())
+        }
         return
     }
-
+    // try to parse result
     try {
         const parserResult = JSON.parse(stdoutData.trim())
 
-        console.log("exit code:", code)
-        console.log("stderr:", stderrData)
-        console.log("report id:", reportId)
-        //console.log("parser result:", parserResult)
+        // handle unsuccessful return from py script
+        if (!parserResult.success) {
+            console.error(`[report ${reportId}] parser reported unsuccessful completion`)
+            return
+        }
 
-        // NEED TO ADD HERE
-        // insert spot_rows
-        // insert statistics
-        // update report_upload set processing_status = 'Processed'
+        // handle successful run
+        console.log(
+            `[report ${reportId}] processed successfully: rows=${parserResult.rows_parsed}, stats=${parserResult.stats_built}`
+        )
+    // handle parsing error from py response
     } catch (err) {
-        console.error("Parser/DB error:", err)
-
-        // NEED TO ADD
-        // update report_upload set processing_status = 'Failed'
-        // most likely remove the upload so we don't have failed rows
+        console.error(`[report ${reportId}] failed to parse parser stdout`)
+        console.error(err)
     }
 }
