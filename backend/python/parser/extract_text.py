@@ -212,6 +212,8 @@ def main():
     result = {
         "success": True,
         "report_data": report_data,
+        "parsed_rows": rows,
+        "parsed_stats": stat_rows,
         "rows_parsed": len(rows),
         "stats_built": len(stat_rows)
     }

@@ -1,6 +1,8 @@
 // server/server.ts
 import express, { Request, Response } from 'express';
 import { pool, waitForDatabase } from "./db/connection";
+import uploadRoutes from "./routes/uploadRoutes"
+import healthRoutes from "./routes/healthRoutes"
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -17,19 +19,10 @@ const allowedOrigins = [
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
-// Example API route
-app.get('/api/hello', (req: Request, res: Response) => {
-  res.json({ message: 'Hello from Express backend!' });
-});
+// Example API routes
+app.use('/api', uploadRoutes)
+app.use('/api', healthRoutes)
 
-app.get('/api/health/db', async (req: Request, res: Response) =>{
-  try {
-    const [rows] = await pool.query("SELECT 1");
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ ok: false });
-  }
-});
 
 // function to handle server startup
 async function startServer() {
