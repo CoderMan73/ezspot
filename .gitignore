@@ -1,5 +1,16 @@
 # Taken from https://github.com/github/gitignore/blob/main/Node.gitignore
 
+# Manual override
+/CAS-example
+CAS_ANALYSIS.md
+
+# AI Tooling
+/.codex
+/.github
+/.vscode
+AGENTS.md
+/ai-docs
+
 # Logs
 logs
 *.log
