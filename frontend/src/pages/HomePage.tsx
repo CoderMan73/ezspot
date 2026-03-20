@@ -4,7 +4,7 @@ function HomePage() {
     const [message, setMessage] = useState('Loading...')
 
     useEffect(() => {
-        fetch('http://localhost:5000/api/hello')
+        fetch('/api/hello')
         .then((res) => res.json())
         .then((data) => setMessage(data.message))
         .catch(() => setMessage('Failed to load backend message'))

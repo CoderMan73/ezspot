@@ -25,7 +25,7 @@ function UploadPage() {
             // attempt to poll
             try {
                 // poll using poll route
-                const response = await fetch(`http://localhost:5000/api/report-status/${reportId}`)
+                const response = await fetch(`/api/report-status/${reportId}`)
                 const data = await response.json()
                 // update status & message
                 setStatus(data.status)
@@ -77,7 +77,7 @@ function UploadPage() {
 
     // try to make backend request
     try {
-        const response = await fetch("http://localhost:5000/api/upload", {
+        const response = await fetch("/api/upload", {
             method: "POST",
             body: formData
         })
