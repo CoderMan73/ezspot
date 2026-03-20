@@ -17,7 +17,15 @@ services:
       DB_HOST: ${DB_HOST}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
-      DB_PASSWORD: ${USER_PASSWORD}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      CAS_LOGOUT_URL: ${CAS_LOGOUT_URL}
+      LOCAL_DEV_USER: ${LOCAL_DEV_USER}
+      CAS_SSO_BASE_URL: ${CAS_SSO_BASE_URL}
+      CAS_SERVER_BASE_URL: ${CAS_SERVER_BASE_URL}
+      CAS_VALIDATE_URL: ${CAS_VALIDATE_URL}
     depends_on:
       - database
   
@@ -29,9 +37,7 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_ROOT_PASSWORD: ${ROOT_PASSWORD}
       MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${USER_PASSWORD}
-    ports:
-      - "3306:3306"
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
 
