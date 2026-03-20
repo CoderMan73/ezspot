@@ -2,7 +2,7 @@
 
 @REM DONT change registry
 set REGISTRY=container.cs.vt.edu/anonymous/capsp26-coe-pdf-extraction-team-e-zspot
-set VERSION=DEBUG-DELETE-LATER
+set VERSION=cas-working
 
 @REM Use bat working directory
 cd /d %~dp0
