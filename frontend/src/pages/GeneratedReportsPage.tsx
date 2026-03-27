@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdArrowForward } from 'react-icons/md';
-import { MdArrowOutward } from "react-icons/md";
 import vtLogo from '../assets/vt_logo.png';
 import '../styles/GeneratedReportsPage.css';
 

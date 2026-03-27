@@ -23,12 +23,10 @@ def connection_setup():
     return conn, conn.cursor()
 
 
-def build_report_data(filename: str, semester: str, year: int, user_pid: str) -> dict:
+def build_report_data(filename: str, user_pid: str) -> dict:
     return {
         "filename": filename,
-        "semester": semester,
-        "year": year,
-        "processing_status": "Processed",
+        "processing_status": "Procesing",
         "user_pid": user_pid
     }
 
@@ -80,6 +78,11 @@ def parse_pdf(pdf_path: str) -> list:
                 crn_cropped = page.crop(crn_box)
                 crn_words = crn_cropped.extract_words()
 
+                # same for year 
+                year_box = (rank_end + 120, top, rank_end + 175, bottom)
+                year_cropped = page.crop(year_box)
+                year_words = year_cropped.extract_words()
+
 
 
                 # create string to hold full name of professor
@@ -104,24 +107,79 @@ def parse_pdf(pdf_path: str) -> list:
                 if (rank_words):
                     rank = rank_words[0]['text']
 
+                # handle year data
+                # get all the date values for the given table and save the positioning 
+                terms = []
+                for year_word in year_words:
+                    txt = year_word["text"].strip()
+                    if txt.isdigit() and len(txt) == 6:
+                        terms.append({
+                            "term": txt,
+                            "year": int(txt[:4]),
+                            "top": year_word["top"]
+                        })
+
+
                 # get table data to extract enrollments and means
                 table_data = table.extract()
                 crns = []
+                # loop over crns and make sure they work while also appending
+                # location data that we can compare against later 
                 for k, crn_word in enumerate(crn_words):
-                    supposed_crn = crn_word['text']
-                    if (looks_like_crn(supposed_crn)):
-                        crns.append(supposed_crn)
+                    supposed_crn = crn_word["text"].strip()
+                    if looks_like_crn(supposed_crn):
+                        crns.append({
+                            "crn": supposed_crn,
+                            "top": crn_word["top"],
+                            "year": None
+                        })
+                
+                # update year values for the crns
+                if len(terms) == 0:
+                    raise ValueError("Parse error: no term values found in year box.")
+
+                elif len(terms) == 1:
+                    # only one term in this section, so all rows get that year
+                    for crn_entry in crns:
+                        crn_entry["year"] = terms[0]["year"]
+
+                else:
+                    # loop over the crns and those under the line need the second year
+                    # while those above get the first
+                    first_year = terms[0]["year"]
+                    second_year = terms[1]["year"]
+                    switch_top = terms[1]["top"]
+
+                    for crn_entry in crns:
+                        if crn_entry["top"] < switch_top:
+                            crn_entry["year"] = first_year
+                        else:
+                            crn_entry["year"] = second_year
+
                 
                 if len(crns) != len(table_data):
                     raise ValueError(
                         f"Parse error: CRN/table row count mismatch (crns={len(crns)}, rows={len(table_data)})."
                     )
 
-                for i, crn in enumerate(crns):
+                # build the rows
+                for i, crn_entry in enumerate(crns):
+                    crn = crn_entry["crn"]
+                    row_year = crn_entry["year"]
+
                     crn_enrollment = table_data[i][0]
                     crn_mean_score = table_data[i][2]
-                    row = row_builder(first, last, classification, rank, crn, crn_enrollment, crn_mean_score)
-                    #print(f"{row}\n", file=sys.stderr)
+
+                    row = row_builder(
+                        first,
+                        last,
+                        classification,
+                        rank,
+                        crn,
+                        crn_enrollment,
+                        crn_mean_score,
+                        row_year
+                    )
                     rows.append(row)
 
             print(f"Page {j+1} Finished\n", file=sys.stderr)
@@ -130,7 +188,7 @@ def parse_pdf(pdf_path: str) -> list:
 
 
 
-def row_builder(fname: str, lname:str, cl:str, rank:str, crn:str, enrollment:str, average:str) -> dict:
+def row_builder(fname: str, lname:str, cl:str, rank:str, crn:str, enrollment:str, average:str, year:int) -> dict:
     # normalize the average for insertion
     if (average == ''):
         newAvg = None
@@ -148,7 +206,8 @@ def row_builder(fname: str, lname:str, cl:str, rank:str, crn:str, enrollment:str
             "instr_rank": rank,
             "crn": int(crn),
             "students_enrolled": newEnroll,
-            "instr_rating_mean": newAvg}
+            "instr_rating_mean": newAvg,
+            "year": year}
 
 
 def get_header_info(pdf) -> str:
@@ -177,7 +236,7 @@ def looks_like_crn(s: str) -> bool:
     return s.isdigit() and len(s) == 5
 
 
-def compute_stat_rows(lst: list, semester: str, year: int) -> list:
+def compute_stat_rows(lst: list) -> list:
     prof_stats = {}
     # loop over the spot list
     for row in lst:
@@ -187,8 +246,7 @@ def compute_stat_rows(lst: list, semester: str, year: int) -> list:
             prof_stats[key] = {
                 "first_name": row['first_name'].strip(),
                 "last_name": row['last_name'].strip(),
-                "semester": semester,
-                "year": year,
+                "year": row["year"],
                 "sum": 0.0,
                 "count": 0
             }
@@ -205,7 +263,6 @@ def compute_stat_rows(lst: list, semester: str, year: int) -> list:
             stats.append({
                 "first_name": prof["first_name"],
                 "last_name": prof["last_name"],
-                "semester": prof["semester"],
                 "year": prof["year"],
                 "rating": round(prof["sum"] / prof["count"], 2)
             })
@@ -215,20 +272,20 @@ def compute_stat_rows(lst: list, semester: str, year: int) -> list:
 
 def process_report(pdf_path: str, report_data: dict) -> tuple[list, list]:
     rows = parse_pdf(pdf_path)
-    stat_rows = compute_stat_rows(rows, report_data["semester"], report_data["year"])
+    stat_rows = compute_stat_rows(rows)
     return rows, stat_rows
 
 
 # Returns exit code  
-def insert_spot_rows(spot_rows: list, report_id: int,  year: int,  semester: str, cursor) -> bool:
+def insert_spot_rows(spot_rows: list, report_id: int, cursor) -> bool:
     # handle no given spot rows
     if (spot_rows is None):
         return 1
     # create querey
     query = """
     INSERT INTO spot_rows
-    (report_id, first_name, last_name, instr_classification, instr_rank, crn, students_enrolled, instr_rating_mean, semester, year)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    (report_id, first_name, last_name, instr_classification, instr_rank, crn, students_enrolled, instr_rating_mean, year)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     # create values list from spot_rows
     values_list = []
@@ -242,8 +299,7 @@ def insert_spot_rows(spot_rows: list, report_id: int,  year: int,  semester: str
             row["crn"],
             row["students_enrolled"],
             row["instr_rating_mean"],
-            semester,
-            year
+            row["year"]
 
         ))
     # execute the queries with the values
@@ -259,15 +315,14 @@ def insert_stat_rows(stat_rows: list, report_id: int, cursor) -> bool:
     # create querey
     query = """
     INSERT INTO statistics
-    (report_id, semester, year, rating, instr_first_name, instr_last_name)
-    VALUES (%s, %s, %s, %s, %s, %s)
+    (report_id, year, rating, instr_first_name, instr_last_name)
+    VALUES (%s, %s, %s, %s, %s)
     """
     # create values list from spot_rows
     values_list = []
     for row in stat_rows:
         values_list.append((
             report_id,
-            row['semester'],
             row["year"],
             row['rating'],
             row['first_name'],
@@ -287,33 +342,31 @@ def update_report_status(report_id: int, status: str, curr):
 
 
 def main():
-    # handle arg count
-    if len(sys.argv) != 7:
-        print("Usage: script pdf_path semester year user_pid filename report_id", file=sys.stderr)
+    if len(sys.argv) != 5:
+        print("Usage: script pdf_path user_pid filename report_id", file=sys.stderr)
         sys.exit(2)
 
-    # create db connection and get args
     conn, curr = connection_setup()
+
     pdf_path = sys.argv[1]
-    semester = sys.argv[2]
-    year = int(sys.argv[3])
-    user_pid = sys.argv[4]
-    filename = sys.argv[5]
-    report_id = int(sys.argv[6])
+    user_pid = sys.argv[2]
+    filename = sys.argv[3]
+    report_id = int(sys.argv[4])
 
-    # create the report data, spot_rows, and stat_rows
-    report_data = build_report_data(filename, semester, year, user_pid)
-    rows, stat_rows = process_report(pdf_path, report_data)
-
-    # create SQL transaction for inserting the bulk data
     try:
-        exit_code = insert_spot_rows(rows, report_id, year, semester, curr)
+        report_data = build_report_data(filename, user_pid)
+        rows, stat_rows = process_report(pdf_path, report_data)
+
+        exit_code = insert_spot_rows(rows, report_id, curr)
         exit_code_stat = insert_stat_rows(stat_rows, report_id, curr)
-        # update the report with the completed sign
-        if (exit_code == 0 and exit_code_stat == 0):
+
+        if exit_code == 0 and exit_code_stat == 0:
             update_report_status(report_id, 'Processed', curr)
+        else:
+            update_report_status(report_id, 'Failed', curr)
+
         conn.commit()
-        # print result 
+
         result = {
             "success": True,
             "report_id": report_id,
@@ -322,15 +375,20 @@ def main():
             "spot_exit_code": exit_code,
             "stat_exit_code": exit_code_stat
         }
-
         print(json.dumps(result))
+        sys.exit(0)
 
     except Exception as e:
-        conn.rollback()
-        print(f"Database error: {e}", file=sys.stderr)
-        update_report_status(report_id, 'Failed', curr)
-        conn.commit()
+        try:
+            conn.rollback()
+            update_report_status(report_id, 'Failed', curr)
+            conn.commit()
+        except Exception as update_error:
+            print(f"Failed to update report status: {update_error}", file=sys.stderr)
+
+        print(f"Parser/Database error: {e}", file=sys.stderr)
         sys.exit(1)
+
     finally:
         curr.close()
         conn.close()
@@ -338,12 +396,4 @@ def main():
     
 
 if __name__ == "__main__":
-    try:
-        main()
-        sys.exit(0)
-    except ValueError as e:
-        print(str(e), file=sys.stderr)
-        sys.exit(2)
-    except Exception as e:
-        print(f"Parser error: {e}", file=sys.stderr)
-        sys.exit(1)
+    main()

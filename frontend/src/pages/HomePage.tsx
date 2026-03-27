@@ -7,8 +7,10 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('home');
   const [showModal, setShowModal] = useState(false);
-  const [academicYear, setAcademicYear] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'failed'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusVisible, setStatusVisible] = useState(false);
 
   const handleUploadClick = () => {
     setShowModal(true);
@@ -20,21 +22,90 @@ export default function HomePage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (academicYear && selectedFile) {
-      console.log('Academic Year:', academicYear);
-      console.log('File:', selectedFile);
-      // TODO: Handle file upload
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (selectedFile) {
+    console.log('File:', selectedFile);
+
+    try {
+      setStatusVisible(true);
+      setUploadStatus('uploading');
+      setStatusMessage('Uploading report');
+
+      const formData = new FormData();
+      formData.append('pdf', selectedFile);
+
+      // NEED TO REPLACE THIS WITH THE ACTUAL PID FROM THE USERS TABLE WHEN HOOKED UP
+      formData.append('userPid', 'joe.bloggs');
+
+      // send the upload request
+      // HARD CODED LOCAL PATH NEED TO CHANGE
+      const uploadResponse = await fetch('http://localhost:5000/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // handle error in request sending
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.message || 'Upload failed.');
+      }
+
+      // get response data
+      const uploadData = await uploadResponse.json();
+      const reportId = uploadData.report_id;
+
+      setUploadStatus('processing');
+      setStatusMessage('Processing report');
+
+      // poll for response 
+      const pollStatus = async () => {
+        try {
+          // HARDCODED PATH NEEDS TO BE CHANGED
+          const statusResponse = await fetch(`http://localhost:5000/api/report-status/${reportId}`);
+
+          if (!statusResponse.ok) {
+            const errorData = await statusResponse.json();
+            throw new Error(errorData.message || 'Failed to fetch report status.');
+          }
+
+          const statusData = await statusResponse.json();
+          console.log('Report status:', statusData.status);
+
+          if (statusData.status === 'Processing') {
+            setUploadStatus('processing');
+            setStatusMessage('Processing report');
+            setTimeout(pollStatus, 2000);
+          } else if (statusData.status === 'Processed') {
+            setUploadStatus('success');
+            setStatusMessage('Report processed successfully.');
+          } else if (statusData.status === 'Failed') {
+            setUploadStatus('failed');
+            setStatusMessage('Report processing failed.');
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+          setUploadStatus('failed');
+          setStatusMessage('Could not check report status.');
+        }
+      };
+
+      pollStatus();
+
       setShowModal(false);
-      setAcademicYear('');
       setSelectedFile(null);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setStatusVisible(true);
+      setUploadStatus('failed');
+      setStatusMessage(err instanceof Error ? err.message : 'Upload failed.');
     }
-  };
+  }
+};
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setAcademicYear('');
     setSelectedFile(null);
   };
 
@@ -43,6 +114,12 @@ export default function HomePage() {
       (window as any).fileInput = e;
     }
   };
+
+  const renderLoadingDots = () => (
+  <span className="status-dots" aria-hidden="true">
+    <span>.</span><span>.</span><span>.</span>
+  </span>
+  );
 
   return (
     <div className="home-container">
@@ -87,6 +164,34 @@ export default function HomePage() {
           <button className="upload-btn" onClick={handleUploadClick}>
             Upload SPOT Reports
           </button>
+          {statusVisible && (
+          <div className={`upload-status-card ${uploadStatus}`}>
+            <div className="upload-status-row">
+              {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
+                <div className="status-spinner" aria-hidden="true" />
+              )}
+
+              {(uploadStatus === 'success' || uploadStatus === 'failed') && (
+                <div className="status-icon" aria-hidden="true">
+                  {uploadStatus === 'success' ? '✓' : '✕'}
+                </div>
+              )}
+
+              <div className="upload-status-text">
+                <strong>
+                  {uploadStatus === 'uploading' && 'Uploading'}
+                  {uploadStatus === 'processing' && 'Processing'}
+                  {uploadStatus === 'success' && 'Complete'}
+                  {uploadStatus === 'failed' && 'Failed'}
+                </strong>
+                <p>
+                  {statusMessage}
+                  {(uploadStatus === 'uploading' || uploadStatus === 'processing') && renderLoadingDots()}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
 
         {/* Steps */}
@@ -145,17 +250,6 @@ export default function HomePage() {
               <button className="modal-close" onClick={handleCloseModal}>✕</button>
             </div>
             <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-group">
-                <label htmlFor="academic-year">Academic Year</label>
-                <input
-                  type="text"
-                  id="academic-year"
-                  placeholder="e.g. 2023-2024"
-                  value={academicYear}
-                  onChange={(e) => setAcademicYear(e.target.value)}
-                  required
-                />
-              </div>
               <div className="form-group">
                 <label>Select PDF File</label>
                 <input

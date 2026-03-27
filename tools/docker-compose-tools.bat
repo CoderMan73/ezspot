@@ -13,7 +13,7 @@ if /I "%1"=="up" (
     echo Starting Docker Compose stack...
     docker-compose up --build -d
     echo Stack started.
-    echo Frontend: http://localhost:5000/
+    echo Frontend: http://localhost:3000/
     echo Backend: http://localhost:5000/api
     echo Adminer: http://localhost:8080
     exit /b 0
