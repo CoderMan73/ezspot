@@ -40,6 +40,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
+      - ./tools/updated_testdb.sql:/docker-entrypoint-initdb.d/updated_testdb.sql
 
   # Adminer
   adminer:
