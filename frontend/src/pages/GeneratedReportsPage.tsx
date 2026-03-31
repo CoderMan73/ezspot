@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdArrowForward } from 'react-icons/md';
 import vtLogo from '../assets/vt_logo.png';
 import '../styles/GeneratedReportsPage.css';
 
+
 interface Report {
   id: string;
+  reportName: string;
   author: {
     name: string;
-    role: string;
     avatar?: string;
   };
   created: string;
-  catalogYear: string;
-  documents: {
+  documents: {  
     name: string;
-    url: string;
+    subtitle: string;
+    type: string;
   }[];
 }
 
@@ -27,39 +28,71 @@ export default function GeneratedReportsPage() {
   const [expandedAuthors, setExpandedAuthors] = useState<Set<string>>(new Set());
   const itemsPerPage = 10;
 
-  // Sample data - replace with actual data from backend
-  const allReports: Report[] = [
-    {
-      id: '906578923',
-      author: {
-        name: 'Alicia Brown',
-        role: 'Enrollment Services Specialist',
-        avatar: 'S'
-      },
-      created: '2/27/2026 11:00 AM',
-      catalogYear: '2024 - 2025',
-      documents: [
-        { name: 'Prospective Teaching Awards List 2024 - 2025 #906578923', url: '#' },
-        { name: 'Teaching Awards List 2024 - 2025 #906578923', url: '#' },
-        { name: 'Teaching Dean\'s List 2024 - 2025 #906578923', url: '#' }
-      ]
-    }
-  ];
+  const [allReports, setAllReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredReports = allReports.filter((report) =>
-    report.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    report.catalogYear.includes(searchQuery)
-  );
+  const normalizedQuery = searchQuery.toLowerCase().trim();
+
+  const filteredReports = allReports.filter((report) => {
+    const name = report.reportName.toLowerCase();
+
+    const normalizedName = name
+      .replace(/[-_.]/g, " ")   // replace separators
+      .replace(/\s+/g, " ");    // clean spaces
+
+    return (
+      report.author.name.toLowerCase().includes(normalizedQuery) ||
+      name.includes(normalizedQuery) ||
+      normalizedName.includes(normalizedQuery)
+    );
+  });
 
   const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReports = filteredReports.slice(startIndex, startIndex + itemsPerPage);
 
-  // Initialize expanded state with all authors by default
   useEffect(() => {
-    const allIds = new Set(paginatedReports.map(r => r.id));
-    setExpandedAuthors(allIds);
-  }, [paginatedReports.length]);
+    const fetchReports = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/reports/user/joe.bloggs"); // TEMP
+        const data = await res.json();
+
+        const mappedReports: Report[] = data.map((row: any) => ({
+          id: String(row.report_id),
+          reportName: String(row.filename),
+          author: {
+            name: row.user_pid,
+          },
+          created: new Date(row.upload_time).toLocaleString(),
+          documents: [
+            {
+              name: `Prospective Teaching Awards List`,
+              subtitle: `Sheet containing data from all entries in the report.`,
+              type: "prospective-awards"
+            },
+            {
+              name: `Top 30 Teaching Awards List`,
+              subtitle: `Sheet containing the top 30 highest rated professors in the report.`,
+              type: "teaching-awards"
+            },
+            {
+              name: `Teaching Dean's List`,
+              subtitle: `Document containing all professors on the Dean's List from this report ordered alphabetically.`,
+              type: "deans-list"
+            }
+          ]
+        }));
+
+        setAllReports(mappedReports);
+      } catch (err) {
+        console.error("Failed to fetch reports:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -94,9 +127,14 @@ export default function GeneratedReportsPage() {
       if (currentPage < totalPages - 2) pages.push('...');
       pages.push(totalPages);
     }
-    
+  
+
     return pages;
   };
+
+  if (loading) {
+  return <div>Loading...</div>;
+  }
 
   return (
     <div className="home-container">
@@ -132,14 +170,7 @@ export default function GeneratedReportsPage() {
       <main className="main-report-content">
         <div className="reports-header">
           <h1>Generated Reports</h1>
-        </div>
 
-        <div className="reports-controls">
-          <div className="filter-section">
-            <label className="filter-label">
-              Documents
-            </label>
-          </div>
           <div className="search-section">
             <input
               type="text"
@@ -153,28 +184,24 @@ export default function GeneratedReportsPage() {
             />
           </div>
         </div>
-
         {/* Reports Table */}
         <div className="table-wrapper">
           <table className="reports-table">
             <thead>
               <tr>
                 <th className="col-author">
-                  Author 
+                  Generated By
                 </th>
                 <th className="col-created">
                   Created 
                 </th>
-                <th className="col-catalog">
-                  Catalog Year 
-                </th>
-                <th className="col-id">ID</th>
+                <th className="col-id">Report Name</th>
               </tr>
             </thead>
             <tbody>
               {paginatedReports.map((report) => (
-                <>
-                  <tr key={report.id} className="table-row-group">
+                <React.Fragment key={report.id}>
+                  <tr className="table-row-group">
                     <td className="row-author-cell">
                       <div className="author-info">
                         <button
@@ -186,33 +213,38 @@ export default function GeneratedReportsPage() {
                         </button>
                         <div className="author-details">
                           <div className="author-name">{report.author.name}</div>
-                          <div className="author-role">{report.author.role}</div>
                         </div>
                       </div>
                     </td>
                     <td>{report.created}</td>
-                    <td>{report.catalogYear}</td>
-                    <td>{report.id}</td>
+                    <td>{report.reportName}</td>
                   </tr>
+
                   {expandedAuthors.has(report.id) &&
                     report.documents.map((doc, index) => (
                       <tr key={`${report.id}-${index}`} className="table-row-document">
-                        <td className="document-cell" colSpan={4}>
-                            <div className="document-info">
-                                <MdArrowForward className="document-arrow" />
-                                <div>
-                                    <div className="document-name">
-                                    {doc.name}
-                                    </div>
-                                    <a href={doc.url} className="document-download-link" download>
-                                    Download
-                                    </a>
-                                </div>
+                        <td className="document-cell" colSpan={3}>
+                          <div className="document-info">
+                            <MdArrowForward className="document-arrow" />
+                            <div>
+                              <div className="document-name">
+                                {doc.name}
+                              </div>
+                              <div className="document-subtitle">
+                                {doc.subtitle}
+                              </div>
+                              <button
+                                className="document-download-link"
+                                onClick={() => console.log(report.id, doc.type)}
+                              >
+                                Download
+                              </button>
                             </div>
-                            </td>
+                          </div>
+                        </td>
                       </tr>
                     ))}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

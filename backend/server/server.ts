@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import { pool, waitForDatabase } from "./db/connection";
 import uploadRoutes from "./routes/uploadRoutes"
 import healthRoutes from "./routes/healthRoutes"
+import displayDataRoutes from "./routes/displayDataRoutes"
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -22,6 +23,7 @@ app.use(express.json());
 // Example API routes
 app.use('/api', uploadRoutes)
 app.use('/api', healthRoutes)
+app.use('/api', displayDataRoutes)
 
 
 // function to handle server startup
