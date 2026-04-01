@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: 22012s26-ezspot
+spec:
+  # Spin up 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # Give the secret to access the container registry
+      imagePullSecrets:
+        - name: discovery-token
+      containers:
+        - name: container-0
+          # Add a placeholder so diff version can be deployed
+          image: container.cs.vt.edu/anonymous/capsp26-coe-pdf-extraction-team-e-zspot/backend:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: backend
+              protocol: TCP
+          env:
+            - name: DB_HOST
+              value: "database"
+
+            - name: DB_NAME
+              value: "${DB_NAME}"
+              
+            - name: DB_USER
+              value: "${DB_USER}"
+
+            - name: FRONTEND_URL
+              value: "${FRONTEND_URL}"
+
+            - name: CAS_SERVER_BASE_URL
+              value: "${CAS_SERVER_BASE_URL}"
+
+            - name: CAS_LOGOUT_URL
+              value: "${CAS_LOGOUT_URL}"
+
+            - name: CAS_SSO_BASE_URL
+              value: "${CAS_SSO_BASE_URL}"
+
+            - name: CAS_VALIDATE_URL
+              value: "${CAS_VALIDATE_URL}"
+
+            - name: CORS_ALLOWED_ORIGINS
+              value: "${CORS_ALLOWED_ORIGINS}"
+
+            - name: LOCAL_DEV_USER
+              value: "${LOCAL_DEV_USER}"
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: DB_PASSWORD
+                  optional: false
+
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: SESSION_SECRET
+                  optional: false
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            # Allow writes to own filesystem
+            readOnlyRootFilesystem: false
+            # Run root inside container
+            runAsNonRoot: false

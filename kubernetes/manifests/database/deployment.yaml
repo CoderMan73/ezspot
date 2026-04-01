@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database
+  namespace: 22012s26-ezspot
+spec:
+  # Make 1 copy
+  replicas: 1
+
+  # Look for pods with 'database' label
+  selector:
+    matchLabels:
+      app: database
+
+  # Make pods with label 'database'
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      imagePullSecrets:
+        - name: discovery-token
+      containers:
+        - name: container-0
+          image: container.cs.vt.edu/anonymous/capsp26-coe-pdf-extraction-team-e-zspot/database:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3306
+              name: database
+              protocol: TCP
+          # env variables are injected at runtime
+          env:
+            - name: MYSQL_DATABASE
+              value: "${DB_NAME}"
+            - name: MYSQL_USER
+              value: "${DB_USER}"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: DB_PASSWORD
+                  optional: false
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: ROOT_PASSWORD
+                  optional: false
+          # mount mysql-data at /var/lib/mysql
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      # mysql-data comes from the mysql-volume PVC
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-volume
