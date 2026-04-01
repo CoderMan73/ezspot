@@ -15,17 +15,6 @@ router.post('/upload', upload.single('pdf'), async (req: Request, res: Response)
         if (!req.file) {
         return res.status(400).json({ message: "No File Uploaded." }) 
         }
-        // validate semester
-        if (!req.body.semester || !["Fall", "Spring"].includes(req.body.semester)) {
-            return res.status(400).json({ message: "Invalid or missing semester." })
-        }
-
-        // validate year
-        const year = Number(req.body.year)
-        // HARDCODED YEAR CONSTRAINT MAY NEED TO CHANGE
-        if (!req.body.year || Number.isNaN(year) || year < 2000 || year > 2100) {
-            return res.status(400).json({ message: "Invalid or missing year." })
-        }
 
         // validate given pid
         if (!req.body.userPid || typeof req.body.userPid !== "string" || req.body.userPid.trim() === "") {
@@ -37,18 +26,14 @@ router.post('/upload', upload.single('pdf'), async (req: Request, res: Response)
         // IF WE CAN KEEP IT HARDCODED LIKE THIS, WE WOULD PROB NEED TO MOVE IT TO ENV ANYWAY
         const parserPath = "/app/python/parser/extract_text.py"
         const pdfPath = req.file.path
-        const semester = req.body.semester
-        const year = req.body.year
         const userPid = req.body.userPid
 
         // start the report upload
-        const reportId = await insertReportUpload(userPid, req.file.originalname, semester, year, "Processing")
+        const reportId = await insertReportUpload(userPid, req.file.originalname, "Processing")
 
         startParserJob({
             parserPath,
             pdfPath,
-            semester,
-            year,
             userPid,
             originalName: req.file.originalname,
             reportId

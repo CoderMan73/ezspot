@@ -14,15 +14,16 @@ export const pool = mysql.createPool({
 export async function waitForDatabase(retries = 10, delay = 3000) {
     while (retries) {
         try {
-        const conn = await pool.getConnection();
-        await conn.ping();
-        conn.release();
-        console.log("Database connection established");
-        return;
+            const conn = await pool.getConnection();
+            await conn.ping();
+            conn.release();
+            console.log("Database connection established");
+            return;
         } catch (err) {
-        console.log("Database not ready, retrying...");
-        retries--;
-        await new Promise(res => setTimeout(res, delay));
+            console.log("Database not ready, retrying...");
+            console.log(err);
+            retries--;
+            await new Promise(res => setTimeout(res, delay));
         }
     }
 

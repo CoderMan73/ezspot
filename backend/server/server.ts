@@ -1,8 +1,9 @@
 import express from 'express';
-import { waitForDatabase } from './db/connection';
+import { pool, waitForDatabase } from './db/connection';
 import authRoutes from './routes/authRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import healthRoutes from './routes/healthRoutes';
+import displayDataRoutes from './routes/displayDataRoutes';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import session from 'express-session';
@@ -63,6 +64,7 @@ app.use(passport.session());
 app.use('/api', authRoutes);
 app.use('/api', uploadRoutes);
 app.use('/api', healthRoutes);
+app.use('/api', displayDataRoutes);
 
 /**
  * Starts the API server after database is ready.

@@ -4,8 +4,6 @@ import { spawn } from 'child_process'
 type ParserJobArgs = {
     parserPath: string
     pdfPath: string
-    semester: string
-    year: string
     userPid: string
     originalName: string
     reportId: number
@@ -14,7 +12,7 @@ type ParserJobArgs = {
 // begins the parsing of the input file
 export function startParserJob(args: ParserJobArgs) {
     // create the args given to the python process
-    const pythonArgs = [args.parserPath, args.pdfPath, args.semester, args.year, args.userPid, args.originalName, String(args.reportId)]
+    const pythonArgs = [args.parserPath, args.pdfPath, args.userPid, args.originalName, String(args.reportId)]
 
     // call the python process
     const pythonProcess = spawn("python", pythonArgs)

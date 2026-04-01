@@ -1,10 +1,7 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
 }
-
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -39,4 +36,95 @@
 
 .read-the-docs {
   color: #888;
+}
+
+
+.upload-status-card {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  max-width: 480px;
+}
+
+.upload-status-card.success {
+  border-color: #b7e4c7;
+}
+
+.upload-status-card.failed {
+  border-color: #efb0b0;
+}
+
+.upload-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-status-text strong {
+  display: block;
+  font-size: 0.98rem;
+  margin-bottom: 3px;
+}
+
+.upload-status-text p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.status-spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #d6dbe3;
+  border-top-color: #861f41;
+  border-radius: 50%;
+  animation: spinStatus 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+.status-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #861f41;
+  flex-shrink: 0;
+}
+
+.status-dots {
+  display: inline-block;
+  min-width: 20px;
+}
+
+.status-dots span {
+  animation: blinkDots 1.4s infinite;
+  opacity: 0.25;
+}
+
+.status-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.status-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes spinStatus {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes blinkDots {
+  0%, 80%, 100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
 }
