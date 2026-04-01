@@ -7,11 +7,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: frontend
+      workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-frontend
   template:
     metadata:
       labels:
         app: frontend
+        workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-frontend
     spec:
       imagePullSecrets:
         - name: discovery-token

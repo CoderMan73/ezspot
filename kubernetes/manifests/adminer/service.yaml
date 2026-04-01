@@ -1,28 +1,14 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: adminer
   namespace: 22012s26-ezspot
 spec:
-  replicas: 1
+  type: ClusterIP
   selector:
-    matchLabels:
-      app: adminer
-  template:
-    metadata:
-      labels:
-        app: adminer
-    spec:
-      containers:
-        - name: adminer
-          image: adminer
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 8080
-              name: adminer
-              protocol: TCP
-          securityContext:
-            allowPrivilegeEscalation: false
-            privileged: false
-            readOnlyRootFilesystem: false
-            runAsNonRoot: false
+    app: adminer
+  ports:
+    - name: adminer
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

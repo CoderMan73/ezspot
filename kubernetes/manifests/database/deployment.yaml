@@ -10,13 +10,14 @@ spec:
   # Look for pods with 'database' label
   selector:
     matchLabels:
-      app: database
+      workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-database
 
   # Make pods with label 'database'
   template:
     metadata:
       labels:
         app: database
+        workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-database
     spec:
       imagePullSecrets:
         - name: discovery-token
@@ -50,6 +51,12 @@ spec:
           volumeMounts:
             - name: mysql-data
               mountPath: /var/lib/mysql
+          # Give proper security
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
       # mysql-data comes from the mysql-volume PVC
       volumes:
         - name: mysql-data

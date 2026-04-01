@@ -8,11 +8,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backend
+      workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-backend
   template:
     metadata:
       labels:
         app: backend
+        workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-backend
     spec:
       # Give the secret to access the container registry
       imagePullSecrets:
@@ -57,18 +58,14 @@ spec:
             - name: LOCAL_DEV_USER
               value: "${LOCAL_DEV_USER}"
 
+            - name: SESSION_SECRET
+              value: "${SESSION_SECRET}"
+
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: database-secrets
                   key: DB_PASSWORD
-                  optional: false
-
-            - name: SESSION_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: database-secrets
-                  key: SESSION_SECRET
                   optional: false
 
           securityContext:

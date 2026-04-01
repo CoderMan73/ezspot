@@ -7,11 +7,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: adminer
+      workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-adminer
   template:
     metadata:
       labels:
         app: adminer
+        workload.user.cattle.io/workloadselector: apps.deployment-22012s26-ezspot-adminer
     spec:
       containers:
         - name: container-0
