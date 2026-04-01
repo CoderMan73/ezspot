@@ -1,11 +1,11 @@
+param(
+  [string]$Command = ""
+)
+
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Join-Path $ScriptDir ".."
-
-param(
-  [string]$Command = ""
-)
 
 if ($Command -eq "") {
   Write-Host "ERROR: no command specified."

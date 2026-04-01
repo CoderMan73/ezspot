@@ -35,7 +35,7 @@ export default function GlobalUploadStatus() {
         const pollStatus = async () => {
         try {
             const statusResponse = await fetch(
-            `http://localhost:5000/api/report-status/${reportId}`
+            `/api/report-status/${reportId}`
             );
 
             if (!statusResponse.ok) {

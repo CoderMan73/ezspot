@@ -31,7 +31,7 @@ services:
   
   # MySql
   database:
-    image: mysql:8.4
+    image: container.cs.vt.edu/anonymous/capsp26-coe-pdf-extraction-team-e-zspot/database:${IMAGE_TAG}
     restart: always
     environment:
       MYSQL_DATABASE: ${DB_NAME}
@@ -40,7 +40,6 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
-      - ./tools/updated_testdb.sql:/docker-entrypoint-initdb.d/updated_testdb.sql
 
   # Adminer
   adminer:

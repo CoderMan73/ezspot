@@ -34,7 +34,7 @@ export default function HomePage() {
 
         // send the upload request
         // HARD CODED LOCAL PATH NEED TO CHANGE
-        const uploadResponse = await fetch('http://localhost:5000/api/upload', {
+        const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
