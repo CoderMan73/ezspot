@@ -105,8 +105,6 @@ function Invoke-ApplyManifests {
     "$ManifestsDir\backend\service.yaml",
     "$ManifestsDir\frontend\deployment.yaml",
     "$ManifestsDir\frontend\service.yaml",
-    "$ManifestsDir\adminer\deployment.yaml",
-    "$ManifestsDir\adminer\service.yaml",
     "$ManifestsDir\ingress.yaml"
   )
 
@@ -127,7 +125,7 @@ switch ($Command) {
     Invoke-ApplyManifests
 
     Write-Host "Scaling all deployments to 1..."
-    foreach ($deployment in @("database", "backend", "frontend", "adminer")) {
+    foreach ($deployment in @("database", "backend", "frontend")) {
       Write-Host "  Scaling $deployment -> 1"
       Kct scale deployment/$deployment --replicas=1
     }
@@ -141,7 +139,7 @@ switch ($Command) {
 
     Write-Host ""
     Write-Host "Waiting for rollouts..."
-    foreach ($deployment in @("database", "backend", "frontend", "adminer")) {
+    foreach ($deployment in @("database", "backend", "frontend")) {
       Write-Host "  Waiting on $deployment..."
       Kct rollout status deployment/$deployment --timeout=120s
     }
@@ -153,7 +151,7 @@ switch ($Command) {
 
   "down" {
     Write-Host "Scaling all deployments to 0 on context: $Context"
-    foreach ($deployment in @("database", "backend", "frontend", "adminer")) {
+    foreach ($deployment in @("database", "backend", "frontend")) {
       Write-Host "  Scaling $deployment -> 0"
       Kct scale deployment/$deployment --replicas=0
     }

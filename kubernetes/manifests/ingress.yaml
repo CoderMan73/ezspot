@@ -27,11 +27,3 @@ spec:
                 name: backend
                 port:
                   number: 3000
-          # /db -> adminer
-          - path: /db
-            pathType: Prefix
-            backend:
-              service:
-                name: adminer
-                port:
-                  number: 8080

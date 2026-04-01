@@ -15,7 +15,6 @@ EZSpot currently runs as four services:
 - `frontend`: Nginx serving the built React app.
 - `backend`: Node/Express Middleware.
 - `database`: MySQL 8.4.
-- `adminer`: web UI for DB.
 
 ### 1.1 Service Topology (Local Docker)
 
@@ -51,7 +50,6 @@ flowchart LR
 | frontend | 3000 | 80 | React UI |
 | backend | 5000 | 3000 | Node/Express Middleware |
 | database | N/A | 3306 | MySQL 8.4 |
-| adminer | 8080 | 8080 | DB admin UI |
 
 ### 1.3 How Containers Talk
 
@@ -64,7 +62,6 @@ flowchart LR
 - Deployed, URL = https://22012s26-ezspot.discovery.cs.vt.edu/
 - User opens UI at `http://URL:3000`.
 - Frontend browser code calls same-origin backend paths at `/api/...`.
-- User can inspect DB through Adminer at `http://URL:8080`.
 
 ## 2) Docker File Structure Guide
 
@@ -102,7 +99,6 @@ Core files for Docker and runtime behavior:
    - Frontend: `http://localhost:3000`
    - Same-origin API check through the frontend proxy: `http://localhost:3000/api/hello`
    - Direct backend check: `http://localhost:5000/api/hello`
-   - Adminer: `http://localhost:8080`
 
 ### 3.3 Data Persistence (Local)
 

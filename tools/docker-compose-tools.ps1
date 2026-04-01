@@ -24,7 +24,6 @@ switch ($Command.ToLower()) {
     Write-Host "Stack started."
     Write-Host "  Frontend: http://localhost:3000/"
     Write-Host "  Backend:  http://localhost:5000/api"
-    Write-Host "  Adminer:  http://localhost:8080"
   }
 
   "down" {
