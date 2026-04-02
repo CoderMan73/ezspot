@@ -1,13 +1,60 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import vtLogo from '../assets/vt_logo.png';
 import '../styles/HomePage.css';
+import CasAuthButton from '../components/CasAuthButton';
+
+type SessionUser = {
+  pid: string
+  email: string
+  name: string
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('home');
   const [showModal, setShowModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
+  const isAuthenticated = useMemo(() => currentUser !== null, [currentUser])
+
+  useEffect(() => {
+    loadCurrentUser()
+  }, [])
+
+  function handleAuthClick() {
+    const returnTo = encodeURIComponent('/')
+    const endpoint = isAuthenticated
+      ? `/api/logout?returnTo=${returnTo}`
+      : `/api/login?returnTo=${returnTo}`
+    window.location.href = endpoint
+  }
+
+  async function loadCurrentUser() {
+
+    try {
+      const response = await fetch('/api/currentUser', {
+        method: 'GET',
+        credentials: 'include',
+      })
+
+      if (response.status === 401) {
+        setCurrentUser(null)
+        return
+      }
+
+      if (!response.ok) {
+        setCurrentUser(null)
+        return
+      }
+
+      const data = await response.json()
+      setCurrentUser(data.user ?? null)
+    } catch {
+      setCurrentUser(null)
+    } 
+  }
 
   const handleUploadClick = () => {
     setShowModal(true);
@@ -107,7 +154,12 @@ export default function HomePage() {
             Generated Reports
           </button>
         </nav>
-        <button className="login-btn">Login with VT CAS</button>
+        <CasAuthButton
+          mode={isAuthenticated ? 'logout' : 'login'}
+          onClick={handleAuthClick}
+          disabled={false} // FIX to prevent double clicks
+          className='login-btn'
+        />
       </aside>
 
       {/* Main Content */}
