@@ -2,6 +2,7 @@ import express from 'express';
 import { pool, waitForDatabase } from './db/connection';
 import authRoutes from './routes/authRoutes';
 import uploadRoutes from './routes/uploadRoutes';
+import spreadsheetRoutes from './routes/spreadsheetRoutes';
 import healthRoutes from './routes/healthRoutes';
 import displayDataRoutes from './routes/displayDataRoutes';
 import cors from 'cors';
@@ -63,6 +64,7 @@ app.use(passport.session());
 
 app.use('/api', authRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', spreadsheetRoutes);
 app.use('/api', healthRoutes);
 app.use('/api', displayDataRoutes);
 

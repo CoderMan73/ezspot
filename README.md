@@ -26,3 +26,4 @@ To locally stop run in project directory:
 - [Docker Guide](docs/Docker.md)
 - [Auth Guide](docs/Auth.md)
 - [Environment Variables Guide](docs/EnvironmentGuide.md)
+- [Spreadsheet Generation Guide](docs/SpreadsheetGeneration.md)
