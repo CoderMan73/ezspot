@@ -1,7 +1,8 @@
 # Parse parameters
 param(
   [string]$Command = "",
-  [string]$Context = "minikube"
+  [string]$Context = "minikube",
+  [string]$EnvFileOverride = ""
 )
 
 # Set any error to end execution
@@ -10,7 +11,7 @@ $ErrorActionPreference = "Stop"
 # Get directories
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ManifestsDir = Join-Path $ScriptDir "..\manifests"
-$EnvFile = Join-Path $ScriptDir "..\..\.env"
+$RepoRoot = Join-Path $ScriptDir "..\.."
 
 # Variables
 $Namespace = "22012s26-ezspot"
@@ -23,7 +24,7 @@ $ValidCommands = @("up", "down", "status", "secrets")
 if ($Command -eq "") {
   Write-Host "Error: no command specified."
   Write-Host ""
-  Write-Host "Usage: deploy.bat <command> [--context=<name>]"
+  Write-Host "Usage: deploy.bat <command> [-Context <name>] [-EnvFileOverride <path>]"
   Write-Host ""
   Write-Host "Commands:"
   Write-Host "  up       Apply manifests and scale all deployments to 1"
@@ -34,6 +35,7 @@ if ($Command -eq "") {
   Write-Host "Options:"
   Write-Host "  -Context <name>  kubectl context (default: minikube)"
   Write-Host "                   Use -Context discovery for production"
+  Write-Host "  -EnvFileOverride <path>  Explicit env file path (optional)"
   exit 1
 }
 
@@ -43,12 +45,30 @@ if ($ValidCommands -notcontains $Command) {
   exit 1
 }
 
-# load .env
+# Resolve env file by context: discovery prefers .env.discovery, others default to .env.
+$DefaultEnvFile = Join-Path $RepoRoot ".env"
+$DiscoveryEnvFile = Join-Path $RepoRoot ".env.discovery"
+
+if ($EnvFileOverride) {
+  $EnvFile = $EnvFileOverride
+} elseif ($Context -eq $ProdContext -and (Test-Path $DiscoveryEnvFile)) {
+  $EnvFile = $DiscoveryEnvFile
+} else {
+  $EnvFile = $DefaultEnvFile
+}
+
+# load selected env file
 if (-not (Test-Path $EnvFile)) {
-  Write-Host "Error: .env file not found at $EnvFile"
-  Write-Host "Copy .env.example to .env at the repo root and fill in values."
+  Write-Host "Error: env file not found at $EnvFile"
+  if ($Context -eq $ProdContext) {
+    Write-Host "Tip: create .env.discovery at the repo root for deployment values."
+  } else {
+    Write-Host "Copy .env.example to .env at the repo root and fill in values."
+  }
   exit 1
 }
+
+Write-Host "Using env file: $EnvFile"
 
 # Read the file
 Get-Content $EnvFile | ForEach-Object {
