@@ -50,7 +50,14 @@ export default function HomePage() {
       }
 
       const data = await response.json()
-      setCurrentUser(data.user ?? null)
+      setCurrentUser(data.user ?? null);
+
+      if (data.user?.pid) {
+        await fetch('/api/users/ensure-me', {
+          method: 'POST',
+          credentials: 'include',
+        });
+}
     } catch {
       setCurrentUser(null)
     } 
@@ -76,14 +83,12 @@ export default function HomePage() {
         const formData = new FormData();
         formData.append('pdf', selectedFile);
 
-        // NEED TO REPLACE THIS WITH THE ACTUAL PID FROM THE USERS TABLE WHEN HOOKED UP
-        formData.append('userPid', 'joe.bloggs');
-
         // send the upload request
         // HARD CODED LOCAL PATH NEED TO CHANGE
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
+          credentials: 'include'
         });
 
         // handle error in request sending
@@ -157,7 +162,7 @@ export default function HomePage() {
         <CasAuthButton
           mode={isAuthenticated ? 'logout' : 'login'}
           onClick={handleAuthClick}
-          disabled={false} // FIX to prevent double clicks
+          disabled={false}
           className='login-btn'
         />
       </aside>

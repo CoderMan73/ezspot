@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MdArrowForward } from 'react-icons/md';
 import vtLogo from '../assets/vt_logo.png';
 import '../styles/GeneratedReportsPage.css';
+import CasAuthButton from '../components/CasAuthButton';
 
 
 interface Report {
@@ -20,6 +21,12 @@ interface Report {
   }[];
 }
 
+type SessionUser = {
+  pid: string;
+  email: string;
+  name: string;
+}
+
 export default function GeneratedReportsPage() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState('reports');
@@ -29,8 +36,13 @@ export default function GeneratedReportsPage() {
   const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
   const itemsPerPage = 10;
 
+  
   const [allReports, setAllReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
+  const isAuthenticated = currentUser !== null;
+
+  
 
   const normalizedQuery = searchQuery.toLowerCase().trim();
 
@@ -38,8 +50,8 @@ export default function GeneratedReportsPage() {
     const name = report.reportName.toLowerCase();
 
     const normalizedName = name
-      .replace(/[-_.]/g, " ")   // replace separators
-      .replace(/\s+/g, " ");    // clean spaces
+      .replace(/[-_.]/g, " ")    
+      .replace(/\s+/g, " ");   
 
     return (
       report.author.name.toLowerCase().includes(normalizedQuery) ||
@@ -52,10 +64,45 @@ export default function GeneratedReportsPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedReports = filteredReports.slice(startIndex, startIndex + itemsPerPage);
 
+    useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/currentUser', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.status === 401 || !response.ok) {
+          setCurrentUser(null);
+          setLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+        setCurrentUser(data.user ?? null);
+      } catch {
+        setCurrentUser(null);
+       }
+    };
+
+    loadCurrentUser();
+  }, []);
+
   useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    if (!currentUser.pid) return;
+
     const fetchReports = async () => {
       try {
-        const res = await fetch("/api/reports/user/joe.bloggs");
+        const res = await fetch(`/api/reports/user`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+
         const data = await res.json();
 
         const mappedReports: Report[] = data.map((row: any) => ({
@@ -93,11 +140,19 @@ export default function GeneratedReportsPage() {
     };
 
     fetchReports();
-  }, []);
+  }, [currentUser]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  function handleAuthClick() {
+    const returnTo = encodeURIComponent('/reports'); 
+    const endpoint = isAuthenticated
+      ? `/api/logout?returnTo=${returnTo}`
+      : `/api/login?returnTo=${returnTo}`;
+    window.location.href = endpoint;
+  }
 
   const toggleAuthorExpand = (authorId: string) => {
     const newExpanded = new Set(expandedAuthors);
@@ -224,7 +279,12 @@ export default function GeneratedReportsPage() {
             Generated Reports
           </button>
         </nav>
-        <button className="login-btn">Login with VT CAS</button>
+        <CasAuthButton
+          mode={isAuthenticated ? 'logout' : 'login'}
+          onClick={handleAuthClick}
+          disabled={false}
+          className="login-btn"
+        />
       </aside>
 
       {/* Main Content */}
