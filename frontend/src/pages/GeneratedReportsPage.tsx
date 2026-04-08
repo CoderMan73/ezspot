@@ -26,6 +26,7 @@ export default function GeneratedReportsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedAuthors, setExpandedAuthors] = useState<Set<string>>(new Set());
+  const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const [allReports, setAllReports] = useState<Report[]>([]);
@@ -106,6 +107,66 @@ export default function GeneratedReportsPage() {
       newExpanded.add(authorId);
     }
     setExpandedAuthors(newExpanded);
+  };
+
+  const getExportEndpoint = (docType: string) => {
+    if (docType === 'prospective-awards') {
+      return '/api/export/prospective';
+    }
+
+    if (docType === 'teaching-awards') {
+      return '/api/export/top30';
+    }
+
+    return null;
+  };
+
+  const getDownloadFileName = (reportName: string, docType: string) => {
+    const baseReportName = reportName.replace(/\.pdf$/i, '');
+
+    if (docType === 'prospective-awards') {
+      return `${baseReportName}-prospective.xlsx`;
+    }
+
+    if (docType === 'teaching-awards') {
+      return `${baseReportName}-top30.xlsx`;
+    }
+
+    return `${baseReportName}.xlsx`;
+  };
+
+  const handleDocumentDownload = async (reportId: string, reportName: string, docType: string) => {
+    const endpoint = getExportEndpoint(docType);
+
+    if (!endpoint) {
+      console.warn(`No export endpoint configured for document type: ${docType}`);
+      return;
+    }
+
+    const downloadKey = `${reportId}-${docType}`;
+    setDownloadingDocument(downloadKey);
+
+    try {
+      const response = await fetch(`${endpoint}?reportId=${encodeURIComponent(reportId)}`);
+
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = getDownloadFileName(reportName, docType);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error(`Failed to download ${docType} for report ${reportId}:`, error);
+    } finally {
+      setDownloadingDocument(null);
+    }
   };
 
   const getPageNumbers = () => {
@@ -235,9 +296,10 @@ export default function GeneratedReportsPage() {
                               </div>
                               <button
                                 className="document-download-link"
-                                onClick={() => console.log(report.id, doc.type)}
+                                onClick={() => handleDocumentDownload(report.id, report.reportName, doc.type)}
+                                disabled={downloadingDocument === `${report.id}-${doc.type}`}
                               >
-                                Download
+                                {downloadingDocument === `${report.id}-${doc.type}` ? 'Downloading...' : 'Download'}
                               </button>
                             </div>
                           </div>
