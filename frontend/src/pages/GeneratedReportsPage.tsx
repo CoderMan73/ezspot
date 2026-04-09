@@ -182,6 +182,10 @@ export default function GeneratedReportsPage() {
       return '/api/export/top30';
     }
 
+    if (docType === 'deans-list') {
+      return '/api/export/deans-list';
+    }
+
     return null;
   };
 
@@ -194,6 +198,10 @@ export default function GeneratedReportsPage() {
 
     if (docType === 'teaching-awards') {
       return `${baseReportName}-top30.xlsx`;
+    }
+
+    if (docType === 'deans-list') {
+      return `${baseReportName}-deans-list.docx`;
     }
 
     return `${baseReportName}.xlsx`;
