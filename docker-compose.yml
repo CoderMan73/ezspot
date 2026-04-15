@@ -31,7 +31,9 @@ services:
   
   # MySql
   database:
-    image: container.cs.vt.edu/anonymous/capsp26-coe-pdf-extraction-team-e-zspot/database:${IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: database/Dockerfile
     restart: always
     environment:
       MYSQL_DATABASE: ${DB_NAME}
