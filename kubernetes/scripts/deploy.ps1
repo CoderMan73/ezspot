@@ -30,7 +30,7 @@ if ($Command -eq "") {
   Write-Host "  up       Apply manifests and scale all deployments to 1"
   Write-Host "  down     Scale all deployments to 0"
   Write-Host "  status   Show pods, services, ingress"
-  Write-Host "  secrets  Create or update database-secrets from .env"
+  Write-Host "  secrets  Create or update Kubernetes secrets from .env"
   Write-Host ""
   Write-Host "Options:"
   Write-Host "  -Context <name>  kubectl context (default: minikube)"
@@ -193,7 +193,7 @@ switch ($Command) {
   }
 
   "secrets" {
-    Write-Host "Creating/updating database-secrets on context: $Context"
+    Write-Host "Creating/updating secrets on context: $Context"
     $dbPassword = [System.Environment]::GetEnvironmentVariable("DB_PASSWORD")
     $rootPassword = [System.Environment]::GetEnvironmentVariable("ROOT_PASSWORD")
     $sessionSecret = [System.Environment]::GetEnvironmentVariable("SESSION_SECRET")
@@ -201,10 +201,13 @@ switch ($Command) {
     kubectl --context=$Context create secret generic database-secrets `
       --from-literal=DB_PASSWORD="$dbPassword" `
       --from-literal=ROOT_PASSWORD="$rootPassword" `
+      --dry-run=client -o yaml | kubectl --context=$Context -n $Namespace apply -f -
+
+    kubectl --context=$Context create secret generic auth-secrets `
       --from-literal=SESSION_SECRET="$sessionSecret" `
       --dry-run=client -o yaml | kubectl --context=$Context -n $Namespace apply -f -
 
-    Write-Host "database-secrets applied."
+    Write-Host "database-secrets and auth-secrets applied."
   }
 
 }

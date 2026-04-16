@@ -59,7 +59,11 @@ spec:
               value: "${LOCAL_DEV_USER}"
 
             - name: SESSION_SECRET
-              value: "${SESSION_SECRET}"
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secrets
+                  key: SESSION_SECRET
+                  optional: false
 
             - name: DB_PASSWORD
               valueFrom:

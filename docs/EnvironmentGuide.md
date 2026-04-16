@@ -11,12 +11,17 @@ EZSpot uses a root `.env` file for Docker Compose substitution.
 - Backend Python utilities read shared DB variables with `os.getenv(...)`.
 - Dockerized frontend Nginx proxies `/api` to the backend container.
 
+For Kubernetes deployments, sensitive values are injected via Kubernetes secrets:
+- `DB_PASSWORD` comes from `database-secrets`.
+- `SESSION_SECRET` comes from `auth-secrets`.
+
 ## 2) Current Root Variables
 
 ### 2.1 Backend Runtime Variables
 
 - `SESSION_SECRET`
   - Used in `backend/server/auth/authConfig.ts` and applied by `backend/server/server.ts` for session signing.
+  - In Kubernetes, this is sourced from secret `auth-secrets` key `SESSION_SECRET`.
 - `FRONTEND_URL`
   - Used by auth redirect logic in `backend/server/auth/authConfig.ts` and `backend/server/auth/authController.ts`.
 - `CORS_ALLOWED_ORIGINS`
