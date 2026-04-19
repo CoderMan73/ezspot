@@ -5,7 +5,9 @@ SELECT
     sr.instr_rank,
     sr.crn,
     sr.students_enrolled,
-    sr.instr_rating_mean
+    sr.instr_rating_mean,
+    sr.course_number,
+    sr.subject
 FROM spot_rows sr
 INNER JOIN (
     SELECT

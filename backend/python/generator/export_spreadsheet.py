@@ -154,6 +154,8 @@ def populate_prospective_sheet(worksheet, rows):
         crn = row[4]
         enrollment = row[5]
         rating = row[6]
+        course_number = row[7]
+        subject = row[8]
         row_key = (first_name, last_name)
 
         if current_key is None:
@@ -174,8 +176,8 @@ def populate_prospective_sheet(worksheet, rows):
         )
         worksheet.cell(row=current_row, column=3, value=classification if is_group_first_row else "")
         worksheet.cell(row=current_row, column=4, value=rank if is_group_first_row else "")
-        worksheet.cell(row=current_row, column=5, value="")
-        worksheet.cell(row=current_row, column=6, value="")
+        worksheet.cell(row=current_row, column=5, value=subject)
+        worksheet.cell(row=current_row, column=6, value=course_number)
         worksheet.cell(row=current_row, column=7, value=int(crn) if crn else "")
         worksheet.cell(row=current_row, column=8, value=enrollment)
         worksheet.cell(row=current_row, column=9, value=rating)
