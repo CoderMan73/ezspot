@@ -217,6 +217,14 @@
   border-bottom: 1px solid #d1d5db;
 }
 
+.selected-row {
+  background-color: #e0f2fe !important; /* Light blue background for selected rows */
+}
+
+.selected-row:hover {
+  background-color: #bae6fd !important; /* Slightly darker on hover */
+}
+
 .row-author-cell {
   padding: 15px !important;
 }
