@@ -1,3 +1,5 @@
 mysql-connector-python
 openpyxl
 PyMuPDF
+docxtpl
+python-docx

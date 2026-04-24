@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdArrowForward } from 'react-icons/md';
+import type { DeansListFormData } from '../components/DeansListModal';
 import vtLogo from '../assets/vt_logo.png';
 import '../styles/GeneratedReportsPage.css';
 import CasAuthButton from '../components/CasAuthButton';
+import DeansListModal from '../components/DeansListModal';
 
 
 interface Report {
@@ -33,6 +35,10 @@ export default function GeneratedReportsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedAuthors, setExpandedAuthors] = useState<Set<string>>(new Set());
   const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
+  const [deansListModalOpen, setDeansListModalOpen] = useState(false);
+  const [deansListModalReportId, setDeansListModalReportId] = useState<string | null>(null);
+  const [deansListModalReportName, setDeansListModalReportName] = useState<string | null>(null);
+  const [deansListGenerating, setDeansListGenerating] = useState(false);
   const itemsPerPage = 10;
 
   
@@ -182,6 +188,10 @@ export default function GeneratedReportsPage() {
       return '/api/export/top30';
     }
 
+    if (docType === 'deans-list') {
+      return '/api/export/deans-list';
+    }
+
     return null;
   };
 
@@ -196,10 +206,22 @@ export default function GeneratedReportsPage() {
       return `${baseReportName}-top30.xlsx`;
     }
 
+    if (docType === 'deans-list') {
+      return `${baseReportName}-deans-list.docx`;
+    }
+
     return `${baseReportName}.xlsx`;
   };
 
   const handleDocumentDownload = async (reportId: string, reportName: string, docType: string) => {
+    // Special handling for Dean's List: open modal instead of immediate download
+    if (docType === 'deans-list') {
+      setDeansListModalReportId(reportId);
+      setDeansListModalReportName(reportName);
+      setDeansListModalOpen(true);
+      return;
+    }
+
     const endpoint = getExportEndpoint(docType);
 
     if (!endpoint) {
@@ -230,6 +252,46 @@ export default function GeneratedReportsPage() {
       console.error(`Failed to download ${docType} for report ${reportId}:`, error);
     } finally {
       setDownloadingDocument(null);
+    }
+  };
+
+  const handleDeansListGenerate = async (formData: DeansListFormData) => {
+    if (!deansListModalReportId) {
+      console.error('Report ID not set for Dean\'s List generation');
+      return;
+    }
+
+    setDeansListGenerating(true);
+
+    try {
+      const response = await fetch(`/api/export/deans-list?reportId=${encodeURIComponent(deansListModalReportId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          formData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Generation failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = getDownloadFileName(deansListModalReportName || 'report', 'deans-list');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Failed to generate Dean\'s List:', error);
+      alert('Failed to generate Dean\'s List. Please try again.');
+    } finally {
+      setDeansListGenerating(false);
     }
   };
 
@@ -422,6 +484,19 @@ export default function GeneratedReportsPage() {
           </div>
         )}
       </main>
+
+      <DeansListModal
+        isOpen={deansListModalOpen}
+        reportId={deansListModalReportId || ''}
+        reportName={deansListModalReportName || ''}
+        onClose={() => {
+          setDeansListModalOpen(false);
+          setDeansListModalReportId(null);
+          setDeansListModalReportName(null);
+        }}
+        onGenerate={handleDeansListGenerate}
+        isLoading={deansListGenerating}
+      />
     </div>
   );
 }

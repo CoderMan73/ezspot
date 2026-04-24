@@ -1,77 +1,117 @@
 import express, { Request, Response } from 'express';
-import { generateSpreadsheetExport } from '../services/spreadsheetService';
+import {
+  generateSpreadsheetExport,
+  generateDeansListExport,
+  DeansListExportArgs,
+} from '../services/spreadsheetService';
 
 const router = express.Router();
 
-/**
- * Parses the report ID from the query string.
- * @param reportIdValue The report ID query value.
- * @returns A numeric report ID or null if invalid.
- */
-function parseReportId(reportIdValue: unknown): number | null {
-  if (typeof reportIdValue !== 'string') {
-    return null;
-  }
+const MIME_EXCEL = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const MIME_WORD = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-  const parsedReportId = Number(reportIdValue);
-  return Number.isInteger(parsedReportId) && parsedReportId > 0 ? parsedReportId : null;
+/**
+ * Validates and extracts the report ID from the request query.
+ */
+function getValidatedReportId(req: Request): number | null {
+  const { reportId } = req.query;
+  if (typeof reportId !== 'string') return null;
+
+  const parsed = Number(reportId);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-  /**
-   * Handles spreadsheet export requests by validating the report ID, generating the workbook, and
-   * returning the Excel file response.
-   * @param req Express request object.
-   * @param res Express response object.
-   * @param exportType The spreadsheet export type to generate.
-   * @param filenamePrefix The filename prefix used in the attachment response.
-   * @returns A streamed Excel file response.
-   */
-async function handleSpreadsheetExport(
+/**
+ * Generic orchestration for report exports.
+ * Handles validation, binary response headers, and error reporting.
+ */
+async function handleExport(
   req: Request,
   res: Response,
-  exportType: 'prospective' | 'top30',
-  filenamePrefix: string,
+  config: {
+    mimeType: string;
+    errorLabel: string;
+    action: (reportId: number) => Promise<{ buffer: Buffer; filename: string }>;
+  },
 ) {
   try {
-    const reportId = parseReportId(req.query.reportId);
-
+    const reportId = getValidatedReportId(req);
     if (reportId === null) {
       return res.status(400).json({ message: 'Invalid or missing reportId.' });
     }
 
-    const exportResult = await generateSpreadsheetExport({
-      exportType,
-      reportId,
-    });
+    const { buffer, filename } = await config.action(reportId);
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filenamePrefix}-${reportId}.xlsx"`);
-
-    return res.status(200).send(exportResult.buffer);
+    res.setHeader('Content-Type', config.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(buffer);
   } catch (error) {
-    console.error(`Failed to generate ${exportType} spreadsheet:`, error);
-    return res.status(500).json({ message: `Failed to generate ${exportType} spreadsheet.` });
+    console.error(`Export failed [${config.errorLabel}]:`, error);
+    return res.status(500).json({ message: `Failed to generate ${config.errorLabel}.` });
   }
 }
 
 /**
- * Downloads the prospective export as an Excel spreadsheet.
- * @param req Express request object.
- * @param res Express response object.
- * @returns A streamed Excel file response.
+ * Sanitizes and defaults Dean's List form data.
  */
-router.get('/export/prospective', async (req: Request, res: Response) => {
-  return handleSpreadsheetExport(req, res, 'prospective', 'prospective-report');
-});
+function sanitizeDeansListData(data: any): DeansListExportArgs['formData'] {
+  const keys: (keyof DeansListExportArgs['formData'])[] = [
+    'dean_first_name',
+    'dean_last_name',
+    'contact_first_name',
+    'contact_last_name',
+    'contact_email',
+    'mean_1000',
+    'mean_2000',
+    'mean_3000',
+    'mean_4000',
+    'mean_5000',
+    'mean_6000',
+    'date',
+  ];
 
-/**
- * Downloads the top 30 export as an Excel spreadsheet.
- * @param req Express request object.
- * @param res Express response object.
- * @returns A streamed Excel file response.
- */
-router.get('/export/top30', async (req: Request, res: Response) => {
-  return handleSpreadsheetExport(req, res, 'top30', 'top30-report');
+  const result = {} as DeansListExportArgs['formData'];
+  for (const key of keys) {
+    result[key] = String(data[key] ?? '').trim();
+  }
+  return result;
+}
+
+router.get('/export/prospective', (req, res) =>
+  handleExport(req, res, {
+    mimeType: MIME_EXCEL,
+    errorLabel: 'prospective spreadsheet',
+    action: async (id) => {
+      const { buffer } = await generateSpreadsheetExport({ exportType: 'prospective', reportId: id });
+      return { buffer, filename: `prospective-report-${id}.xlsx` };
+    },
+  }),
+);
+
+router.get('/export/top30', (req, res) =>
+  handleExport(req, res, {
+    mimeType: MIME_EXCEL,
+    errorLabel: 'top 30 spreadsheet',
+    action: async (id) => {
+      const { buffer } = await generateSpreadsheetExport({ exportType: 'top30', reportId: id });
+      return { buffer, filename: `top30-report-${id}.xlsx` };
+    },
+  }),
+);
+
+router.post('/export/deans-list', (req: Request, res: Response) => {
+  const { formData } = req.body;
+  if (!formData || typeof formData !== 'object') {
+    return res.status(400).json({ message: 'Invalid or missing form data.' });
+  }
+
+  const sanitizedData = sanitizeDeansListData(formData);
+
+  return handleExport(req, res, {
+    mimeType: MIME_WORD,
+    errorLabel: "Dean's List document",
+    action: (id) => generateDeansListExport({ reportId: id, formData: sanitizedData }),
+  });
 });
 
 export default router;
