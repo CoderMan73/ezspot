@@ -285,17 +285,17 @@ def create_deans_list_docx_export(
         "TEACHER_LIST": build_teacher_list_paragraph(teacher_names),
     }
 
-    # Standard styled fields
+    # Standard styled fields (Template Key, Data Key, Font, Size)
     styled_fields = [
-        ("DEAN_FIRST_NAME", FONT_BOOKMAN, SIZE_DEAN_INFO),
-        ("DEAN_LAST_NAME", FONT_BOOKMAN, SIZE_DEAN_INFO),
-        ("CONTACT_FIRST_NAME", FONT_ARIAL, SIZE_CONTACT_INFO),
-        ("CONTACT_LAST_NAME", FONT_ARIAL, SIZE_CONTACT_INFO),
-        ("CONTACT_EMAIL", FONT_ARIAL, SIZE_CONTACT_INFO),
+        ("DEAN_FIRST_NAME", "dean_first_name", FONT_BOOKMAN, SIZE_DEAN_INFO),
+        ("DEAN_LAST_NAME", "dean_last_name", FONT_BOOKMAN, SIZE_DEAN_INFO),
+        ("CONTACT_FIRST_NAME", "contact_first_name", FONT_ARIAL, SIZE_CONTACT_INFO),
+        ("CONTACT_LAST_NAME", "contact_last_name", FONT_ARIAL, SIZE_CONTACT_INFO),
+        ("CONTACT_EMAIL", "contact_email", FONT_ARIAL, SIZE_CONTACT_INFO),
     ]
 
-    for key, font, size in styled_fields:
-        context[key] = get_context_field(user_data, key, font, size, placeholder_formatter)
+    for ctx_key, data_key, font, size in styled_fields:
+        context[ctx_key] = get_context_field(user_data, data_key, font, size, placeholder_formatter)
 
     # Plain fields (means)
     for i in range(1000, 7000, 1000):
