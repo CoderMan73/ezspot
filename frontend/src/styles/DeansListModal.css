@@ -76,6 +76,7 @@
 .deans-list-modal-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevent accidental horizontal scroll */
   padding: 24px;
 }
 
@@ -87,6 +88,8 @@
   border-left: 4px solid var(--primary-color);
   font-size: 0.9rem;
   color: var(--text-muted);
+  word-break: break-word; /* Ensure long filenames don't overflow */
+  overflow-wrap: break-word;
 }
 
 .deans-list-form-section {
@@ -108,13 +111,13 @@
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* Allow columns to shrink */
   gap: 20px;
 }
 
 .form-grid-3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* Allow columns to shrink */
   gap: 16px;
 }
 
