@@ -1,17 +1,42 @@
 import json
 import os
-import shutil
 import sys
 import tempfile
+import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable
 
 import mysql.connector
-from docx import Document
+from docxtpl import DocxTemplate, RichText
 
 
+# --- Constants & Configuration ---
 SCRIPT_DIR = Path(__file__).resolve().parent
+SQL_DIR = SCRIPT_DIR / "sql"
 TEMPLATE_FILENAME = "Teaching Dean's List 2024-25.docx"
+
+# SQL Files
+SQL_FILE_YEAR_BOUNDS = SQL_DIR / "report_year_bounds.sql"
+SQL_FILE_ELIGIBLE_TEACHERS = SQL_DIR / "deans_list_eligible.sql"
+
+# Fonts & Styling
+FONT_BOOKMAN = "Bookman Old Style"
+FONT_ARIAL = "Arial"
+COLOR_RED = "FF0000"
+
+SIZE_DEAN_INFO = 12
+SIZE_ACADEMIC_YEAR_FULL = 10
+SIZE_TEACHER_LIST = 10
+SIZE_CONTACT_INFO = 12
+
+# Eligibility Thresholds
+MIN_STUDENTS_ENROLLED = 30
+MIN_DISTINCT_CRNS = 3
+MIN_INSTR_RATING_MEAN = 5.2
+
+# Placeholder Defaults
+DEFAULT_PLACEHOLDER_FORMATTER = "red"
 
 
 def resolve_template_path() -> Path:
@@ -49,31 +74,21 @@ def connection_setup():
     return conn, conn.cursor()
 
 
-def remove_paragraph(paragraph):
-    """Removes a paragraph from the document XML tree."""
-
-    paragraph_element = paragraph._element
-    paragraph_element.getparent().remove(paragraph_element)
-    paragraph._p = paragraph._element = None
-
-
 def normalize_name(first_name: str, last_name: str) -> str:
     """Builds a display name from first and last name values."""
 
     return f"{first_name.strip()} {last_name.strip()}".strip()
 
 
+def load_sql_query(query_file: Path) -> str:
+    """Loads a SQL query file from disk for runtime execution."""
+    return query_file.read_text(encoding="utf-8").strip()
+
+
 def get_report_year_bounds(cursor, report_id: int) -> tuple[int | None, int | None]:
     """Returns minimum and maximum year values for a report."""
 
-    cursor.execute(
-        """
-        SELECT MIN(year), MAX(year)
-        FROM spot_rows
-        WHERE report_id = %s
-        """,
-        (report_id,),
-    )
+    cursor.execute(load_sql_query(SQL_FILE_YEAR_BOUNDS), (report_id,))
     row = cursor.fetchone()
     if not row:
         return None, None
@@ -86,110 +101,154 @@ def get_eligible_teachers(cursor, report_id: int) -> list[tuple[str, str]]:
     """Fetches instructors that satisfy Dean's List eligibility rules for a report."""
 
     cursor.execute(
-        """
-        SELECT
-            first_name,
-            last_name
-        FROM spot_rows
-        WHERE report_id = %s
-        GROUP BY first_name, last_name
-        HAVING SUM(COALESCE(students_enrolled, 0)) >= 30
-           AND COUNT(DISTINCT crn) >= 3
-           AND AVG(instr_rating_mean) >= 5.2
-        ORDER BY last_name ASC, first_name ASC
-        """,
-        (report_id,),
+        load_sql_query(SQL_FILE_ELIGIBLE_TEACHERS),
+        (report_id, MIN_STUDENTS_ENROLLED, MIN_DISTINCT_CRNS, MIN_INSTR_RATING_MEAN),
     )
     return [(str(first_name), str(last_name)) for first_name, last_name in cursor.fetchall()]
 
 
-def replace_placeholders_in_paragraph(paragraph, replacements: dict[str, str]):
-    """Replaces placeholders in a paragraph while preserving paragraph-level styling."""
-
-    original_text = paragraph.text
-    updated_text = original_text
-
-    for placeholder, value in replacements.items():
-        updated_text = updated_text.replace(placeholder, value)
-
-    if updated_text == original_text:
-        return
-
-    if paragraph.runs:
-        paragraph.runs[0].text = updated_text
-        for run in paragraph.runs[1:]:
-            run.text = ""
-        return
-
-    paragraph.text = updated_text
+def format_placeholder(
+    placeholder_text: str,
+    format_callback: Callable[[str], RichText] | None = None,
+) -> RichText | str:
+    """
+    Formats a placeholder based on whether a value is provided.
+    If no format_callback is provided, returns the placeholder as-is for replacement.
+    """
+    if format_callback is None:
+        return placeholder_text
+    return format_callback(placeholder_text)
 
 
-def replace_placeholders_in_document(document: Document, replacements: dict[str, str]):
-    """Applies placeholder replacements to body paragraphs and table cell paragraphs."""
+def create_red_placeholder_formatter() -> Callable[[str], RichText]:
+    """Creates a formatter that renders missing/placeholder values in red."""
 
-    for paragraph in document.paragraphs:
-        replace_placeholders_in_paragraph(paragraph, replacements)
+    def format_red(text: str) -> RichText:
+        return RichText(text, color=COLOR_RED, bold=True)
 
-    for table in document.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    replace_placeholders_in_paragraph(paragraph, replacements)
+    return format_red
 
 
-def normalize_academic_year_range_sentence(
-    document: Document,
-    start_year: str,
-    end_year: str,
-):
-    """Fixes the range sentence that originally used {{YYYY}}-{{YYYY}} placeholders."""
+def create_plain_rich_text(text: str) -> RichText:
+    """Wraps plain text in a RichText object for docxtpl rendering."""
 
-    duplicate_range = f"{start_year}-{start_year}"
-    desired_range = f"{start_year}-{end_year}"
-
-    for paragraph in document.paragraphs:
-        if duplicate_range in paragraph.text:
-            replace_placeholders_in_paragraph(
-                paragraph,
-                {duplicate_range: desired_range},
-            )
+    return RichText(text)
 
 
-def rebuild_teacher_list(document: Document, teacher_names: list[str]):
-    """Replaces hardcoded teacher names in the template with runtime-generated names."""
+def create_styled_rich_text(
+    text: str,
+    *,
+    font: str | None = None,
+    bold: bool | None = None,
+    size_pt: int | None = None,
+) -> RichText:
+    """Creates RichText with explicit styling.
 
-    anchor_text = "Those teachers who taught at least 30 students"
-    anchor_index = None
+    docxtpl RichText size values are interpreted as half-points in this runtime,
+    so convert requested point sizes (e.g., 10pt -> 20).
+    """
 
-    for index, paragraph in enumerate(document.paragraphs):
-        if paragraph.text.strip().startswith(anchor_text):
-            anchor_index = index
-            break
+    size_half_points = size_pt * 2 if size_pt is not None else None
+    return RichText(text, font=font, bold=bold, size=size_half_points)
 
-    if anchor_index is None:
-        return
 
-    # Remove all paragraphs after the anchor paragraph. The template stores static names there.
-    trailing_paragraphs = list(document.paragraphs[anchor_index + 1 :])
-    for paragraph in trailing_paragraphs:
-        remove_paragraph(paragraph)
+def format_display_date(raw_date: str) -> str:
+    """Formats incoming date text to 'Month DD, YYYY' when possible."""
 
+    stripped = raw_date.strip()
+    if not stripped:
+        return datetime.now().strftime("%B %d, %Y")
+
+    # Preferred input from HTML date fields is YYYY-MM-DD.
+    for pattern in ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y"):
+        try:
+            parsed = datetime.strptime(stripped, pattern)
+            return parsed.strftime("%B %d, %Y")
+        except ValueError:
+            continue
+
+    # If parsing fails, preserve user-entered text.
+    return stripped
+
+
+def build_teacher_list_paragraph(teacher_names: list[str]) -> RichText:
+    """
+    Builds a RichText object containing formatted teacher list.
+    Names are separated by newlines, with custom font styling.
+    """
     if not teacher_names:
-        document.add_paragraph("{{DEANS_LIST_TEACHERS}}")
-        return
+        return create_styled_rich_text(
+            "No eligible teachers found.",
+            font=FONT_BOOKMAN,
+            bold=True,
+            size_pt=SIZE_TEACHER_LIST,
+        )
 
-    for name in teacher_names:
-        document.add_paragraph(name)
+    combined_text = "\n".join(teacher_names)
+    return create_styled_rich_text(
+        combined_text,
+        font=FONT_BOOKMAN,
+        bold=True,
+        size_pt=SIZE_TEACHER_LIST,
+    )
 
 
-def create_deans_list_docx_export(report_id: int) -> dict:
-    """Creates a Dean's List Word export from the project template at runtime."""
+def resolve_academic_years(min_year: int | None, max_year: int | None) -> tuple[str, str]:
+    """Calculates short and full academic year strings based on report data."""
+    if min_year is None:
+        return "{{ACADEMIC_YEAR_SHORT}}", "{{ACADEMIC_YEAR_FULL}}"
+
+    start_year = min_year
+    end_year = max_year if max_year is not None else min_year
+    derived_end_year = end_year if end_year > start_year else (start_year + 1)
+
+    short_end_year = str(derived_end_year)[-2:]
+    academic_year_short = f"{start_year}-{short_end_year}"
+    academic_year_full = f"{start_year}-{derived_end_year}"
+
+    return academic_year_short, academic_year_full
+
+
+def get_context_field(
+    user_data: dict,
+    field_key: str,
+    font: str,
+    size_pt: int,
+    placeholder_formatter: Callable[[str], RichText] | None,
+    bold: bool = False,
+    is_plain: bool = False,
+) -> Any:
+    """Helper to retrieve and style a field for the template context."""
+    value = user_data.get(field_key, "").strip()
+
+    if not value:
+        return format_placeholder(f"{{{{{field_key}}}}}", placeholder_formatter)
+
+    if is_plain:
+        return create_plain_rich_text(value)
+
+    return create_styled_rich_text(value, font=font, size_pt=size_pt, bold=bold)
+
+
+def create_deans_list_docx_export(
+    report_id: int,
+    user_data: dict,
+    placeholder_formatter_name: str = DEFAULT_PLACEHOLDER_FORMATTER,
+) -> dict:
+    """
+    Creates a Dean's List Word export using docxptl with user-provided fields.
+    """
 
     temp_output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
     output_path = Path(temp_output_file.name)
     temp_output_file.close()
 
     template_path = resolve_template_path()
+    placeholder_formatter = (
+        create_red_placeholder_formatter()
+        if placeholder_formatter_name == "red"
+        else None
+    )
 
     conn, cursor = connection_setup()
     try:
@@ -199,47 +258,54 @@ def create_deans_list_docx_export(report_id: int) -> dict:
         cursor.close()
         conn.close()
 
-    shutil.copyfile(template_path, output_path)
-    document = Document(str(output_path))
+    tpl = DocxTemplate(str(template_path))
 
-    if min_year is not None:
-        start_year = min_year
-        end_year = max_year if max_year is not None else min_year
-    else:
-        start_year = None
-        end_year = None
+    academic_year_short, academic_year_full = resolve_academic_years(min_year, max_year)
 
-    if start_year is not None and end_year is not None:
-        derived_end_year = end_year if end_year > start_year else (start_year + 1)
-        yy_value = str(derived_end_year % 100).zfill(2)
-        yyyy_value = str(start_year)
-        derived_end_year_value = str(derived_end_year)
-    else:
-        yy_value = "{{YY}}"
-        yyyy_value = "{{YYYY}}"
-        derived_end_year_value = "{{YYYY}}"
+    teacher_names = [
+        normalize_name(fname, lname) for fname, lname in eligible_teachers
+    ]
 
-    teacher_names = [normalize_name(first_name, last_name) for first_name, last_name in eligible_teachers]
-
-    replacements = {
-        "{{DEAN NAME}}": "{{DEAN NAME}}",
-        "{{DATE}}": datetime.now().strftime("%B %d, %Y"),
-        "{{YYYY}}": yyyy_value,
-        "{{YY}}": yy_value,
-        "{{1000 RATING}}": "{{1000 RATING}}",
-        "{{2000 RATING}}": "{{2000 RATING}}",
-        "{{3000 RATING}}": "{{3000 RATING}}",
-        "{{4000 RATING}}": "{{4000 RATING}}",
-        "{{5000 RATING}}": "{{5000 RATING}}",
-        "{{6000 RATING}}": "{{6000 RATING}}",
-        "{{PROF NAME}}": "{{PROF NAME}}",
-        "{{PROF EMAIL}}": "{{PROF EMAIL}}",
+    # Build context with helper to minimize repetition
+    context = {
+        "DATE": create_styled_rich_text(
+            format_display_date(user_data.get("date", "")),
+            font=FONT_BOOKMAN,
+            size_pt=SIZE_DEAN_INFO,
+        ),
+        "ACADEMIC_YEAR_SHORT": create_styled_rich_text(
+            academic_year_short, font=FONT_BOOKMAN, bold=True, size_pt=SIZE_DEAN_INFO
+        ),
+        "ACADEMIC_YEAR_FULL": create_styled_rich_text(
+            academic_year_full, font=FONT_BOOKMAN, bold=True, size_pt=SIZE_ACADEMIC_YEAR_FULL
+        ),
+        "ACADEMIC_YEAR": create_styled_rich_text(
+            academic_year_short, font=FONT_BOOKMAN, bold=True, size_pt=SIZE_DEAN_INFO
+        ),
+        "TEACHER_LIST": build_teacher_list_paragraph(teacher_names),
     }
 
-    replace_placeholders_in_document(document, replacements)
-    normalize_academic_year_range_sentence(document, yyyy_value, derived_end_year_value)
-    rebuild_teacher_list(document, teacher_names)
-    document.save(str(output_path))
+    # Standard styled fields
+    styled_fields = [
+        ("DEAN_FIRST_NAME", FONT_BOOKMAN, SIZE_DEAN_INFO),
+        ("DEAN_LAST_NAME", FONT_BOOKMAN, SIZE_DEAN_INFO),
+        ("CONTACT_FIRST_NAME", FONT_ARIAL, SIZE_CONTACT_INFO),
+        ("CONTACT_LAST_NAME", FONT_ARIAL, SIZE_CONTACT_INFO),
+        ("CONTACT_EMAIL", FONT_ARIAL, SIZE_CONTACT_INFO),
+    ]
+
+    for key, font, size in styled_fields:
+        context[key] = get_context_field(user_data, key, font, size, placeholder_formatter)
+
+    # Plain fields (means)
+    for i in range(1000, 7000, 1000):
+        key = f"mean_{i}"
+        context[key] = get_context_field(
+            user_data, key, "", 0, placeholder_formatter, is_plain=True
+        )
+
+    tpl.render(context)
+    tpl.save(str(output_path))
 
     return {
         "success": True,
@@ -255,18 +321,33 @@ def parse_report_id(args: list[str]) -> int:
     if len(args) < 2:
         raise ValueError("Missing required report ID argument.")
 
-    report_id = int(args[1])
+    try:
+        report_id = int(args[1])
+    except ValueError:
+        raise ValueError(f"Invalid report ID: {args[1]}. Must be an integer.")
+
     if report_id <= 0:
         raise ValueError("Report ID must be a positive integer.")
 
     return report_id
 
 
+def read_form_data_from_stdin() -> dict:
+    """Reads Dean's List form data from stdin as JSON."""
+    data = sys.stdin.read()
+    if not data:
+        return {}
+    return json.loads(data)
+
+
 if __name__ == "__main__":
     try:
         parsed_report_id = parse_report_id(sys.argv)
-        export_result = create_deans_list_docx_export(parsed_report_id)
+        form_data = read_form_data_from_stdin()
+
+        export_result = create_deans_list_docx_export(parsed_report_id, form_data)
         print(json.dumps(export_result))
     except Exception as error:
         print(f"Word export generation failed: {error}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
