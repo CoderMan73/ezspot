@@ -4,7 +4,7 @@ This is the authentication reference for EZSpot.
 
 It explains:
 1. how authentication is wired in backend and frontend
-2. what `/cas` does end-to-end
+2. what `/login` does end-to-end
 3. where auth logic lives in the codebase
 4. which `server.ts` lines are most important for auth behavior
 5. how local and deployed auth behavior differ
@@ -17,24 +17,24 @@ Auth in this project is session-based and backend-owned:
 - Passport + `express-session` store authenticated user state in session.
 - Frontend reads current session state from `/api/currentUser`.
 
-## 2) `/cas` Page Example Flow
+## 2) /login Page Example Flow
 
-`/cas` is the user-facing auth workflow page:
-- frontend route: `/cas`
+`/login` is the user-facing auth workflow page:
+- frontend route: `/login`
 - it checks current auth state on load
 - it presents one button (`Login` or `Log out`)
-- it redirects to backend auth endpoints with `returnTo=/cas`
+- it redirects to backend auth endpoints with `returnTo=/login`
 
-### 2.1 Sequence: `/cas` Page and Session Check
+### 2.1 Sequence: /login Page and Session Check
 
 ```mermaid
 sequenceDiagram
     participant User as User Browser
-    participant FE as Frontend /cas page
+    participant FE as Frontend /login page
     participant BE as Backend /api/currentUser
 
-    User->>FE: GET /cas
-    FE-->>User: Render CAS page shell
+    User->>FE: GET /login
+    FE-->>User: Render login page shell
     FE->>BE: GET /api/currentUser (credentials: include)
 
     alt authenticated
@@ -46,46 +46,46 @@ sequenceDiagram
     end
 ```
 
-### 2.2 Sequence: Login from `/cas`
+### 2.2 Sequence: Login from /login
 
 ```mermaid
 sequenceDiagram
     participant User as User Browser
-    participant FE as Frontend /cas page
+    participant FE as Frontend /login page
     participant BE as Backend /api/login
     participant CAS as VT CAS
 
     User->>FE: Click Login
-    FE->>BE: GET /api/login?returnTo=/cas
+    FE->>BE: GET /api/login?returnTo=/login
 
     alt localhost host
       BE->>BE: req.logIn(local-dev-user)
-      BE-->>User: 302 to frontend /cas
+      BE-->>User: 302 to frontend /login
     else deployed
       BE->>CAS: Redirect to CAS
       CAS-->>User: CAS login form
       User->>CAS: Submit credentials
       CAS-->>BE: Service ticket callback
       BE->>BE: Validate ticket + req.logIn(user)
-      BE-->>User: 302 to frontend /cas
+      BE-->>User: 302 to frontend /login
     end
 ```
 
-### 2.3 Sequence: Logout from `/cas`
+### 2.3 Sequence: Logout from /login
 
 ```mermaid
 sequenceDiagram
     participant User as User Browser
-    participant FE as Frontend /cas page
+    participant FE as Frontend /login page
     participant BE as Backend /api/logout
     participant CAS as VT CAS logout
 
     User->>FE: Click Log out
-    FE->>BE: GET /api/logout?returnTo=/cas
+    FE->>BE: GET /api/logout?returnTo=/login
     BE->>BE: req.logout + session destroy
 
     alt localhost host
-      BE-->>User: 302 to frontend /cas
+      BE-->>User: 302 to frontend /login
     else deployed
       BE-->>User: 302 to CAS logout URL
       User->>CAS: Complete CAS logout flow
@@ -141,13 +141,13 @@ Fallback behavior:
 
 The auth data mapping decision in Section 5 maps directly to the left side of this ER diagram.
 
-## 6) Frontend `/cas` Implementation References
+## 6) Frontend /login Implementation References
 
-- `frontend/src/pages/CasPage.tsx`
+- `frontend/src/pages/LoginPage.tsx`
   - Loads current user on mount
   - Decides login/logout button mode
-  - Redirects to auth endpoints with `returnTo=/cas`
+  - Redirects to auth endpoints with `returnTo=/login`
 - `frontend/src/components/CasAuthButton.tsx`
   - Reusable auth action button component
 - `frontend/src/App.tsx`
-  - Registers `/cas` route
+  - Registers `/login` route

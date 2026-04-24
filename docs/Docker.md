@@ -11,7 +11,7 @@ It explains:
 
 ## 1) General Design
 
-EZSpot currently runs as four services:
+EZSpot currently runs as three primary services:
 - `frontend`: Nginx serving the built React app.
 - `backend`: Node/Express Middleware.
 - `database`: MySQL 8.4.
@@ -25,22 +25,18 @@ flowchart LR
     subgraph Host[Host Machine]
       HFE[localhost:3000]
       HBE[localhost:5000]
-      HAD[localhost:8080]
     end
 
     subgraph Compose[Docker Compose Network]
       FE[frontend:80]
       BE[backend:3000]
       DB[database:3306]
-      AD[adminer:8080]
     end
 
     U --> HFE --> FE
     U --> HBE --> BE
-    U --> HAD --> AD
 
     BE <--> DB
-    AD <--> DB
 ```
 
 ### 1.2 Port Mapping Reference
@@ -60,7 +56,7 @@ flowchart LR
 
 - Local dev, URL = localhost 
 - Deployed, URL = https://22012s26-ezspot.discovery.cs.vt.edu/
-- User opens UI at `http://URL:3000`.
+- User opens UI at `http://URL:3000` (Local) or `https://URL` (Production).
 - Frontend browser code calls same-origin backend paths at `/api/...`.
 
 ## 2) Docker File Structure Guide
@@ -68,7 +64,7 @@ flowchart LR
 Core files for Docker and runtime behavior:
 
 - `docker-compose.yml`
-  - Defines all four services, port mappings, runtime env injection, and the named DB volume.
+  - Defines services, port mappings, runtime env injection, and the named DB volume.
 - `backend/Dockerfile`
   - Multi-stage build for TypeScript backend.
   - Final runtime image installs Python + venv for parser/generator scripts.
@@ -97,8 +93,8 @@ Core files for Docker and runtime behavior:
    - `./tools/docker-compose-tools.bat up`
 4. Confirm endpoints.
    - Frontend: `http://localhost:3000`
-   - Same-origin API check through the frontend proxy: `http://localhost:3000/api/hello`
-   - Direct backend check: `http://localhost:5000/api/hello`
+   - Same-origin API check through the frontend proxy: `http://localhost:3000/api/currentUser`
+   - Direct backend check: `http://localhost:5000/api/currentUser`
 
 ### 3.3 Data Persistence (Local)
 
@@ -108,7 +104,6 @@ Compose defines a named volume:
 Relevant commands:
 - `docker volume ls`
     - List volumes to see if the volume was properly created.
-    - Likely named something like: `capsp26-coe-pdf-extraction-team-e-zspot_db-data`
 - `docker volume rm`
     - Delete volumes if you would like to reset MySQL database.
 
@@ -121,13 +116,11 @@ flowchart TD
     START[docker compose up]
 
     D[database]
-    A[adminer]
     B[backend container started]
     F[frontend]
     Q{DB connection ready?}
 
     START --> D
-    D --> A
     D --> B
     B --> F
     B -->|ping DB| Q
@@ -156,14 +149,7 @@ sequenceDiagram
   FE-->>UB: JSON response
 ```
 
-Notes:
-- Browser code uses the frontend host/port and same-origin `/api/...` paths.
-- Frontend Nginx proxies `/api/*` to the backend container.
-- Browser code should not use Docker service DNS names like `backend:3000`.
-
 ## 4) Deployed Model (Kubernetes-Oriented)
-
-This section showcases how the stack looks when deployed on the VT discovery Kubernetes cluster.
 
 ### 4.1 High-Level Deployed Flow
 
@@ -189,11 +175,6 @@ sequenceDiagram
     IC-->>UB: JSON response
 ```
 
-Notes:
-- Browser API calls are same-origin path calls (`/api/...`) in deployed mode.
-- Ingress handles route mapping.
-- Services handle internal communication.
-
 ## 5) Common Commands
 
 ### 5.1 Team Wrapper Scripts (`tools/`)
@@ -201,17 +182,16 @@ Notes:
 | Command | What it does |
 |---|---|
 | `./tools/docker-compose-tools.bat up` | Runs `docker-compose up --build -d`, starts full stack, prints local URLs. |
-| `./tools/docker-compose-tools.bat down` | Stops and removes running compose resources (except named volumes). |
-| `./tools/build-push.bat` | Builds frontend/backend images and pushes them to configured GitLab container registry. |
+| `./tools/docker-compose-tools.bat down` | Stops and removes running compose resources. |
+| `./tools/build-push.bat` | Builds and pushes images to the GitLab container registry. |
 
 ### 5.2 Raw Docker Compose Commands
 
 | Command | What it does |
 |---|---|
-| `docker compose build` | Builds/rebuilds all images defined in compose. |
-| `docker compose up --build -d` | Builds if needed and starts services in detached mode. |
+| `docker compose build` | Builds/rebuilds all images. |
+| `docker compose up --build -d` | Starts services in detached mode. |
 | `docker compose ps` | Shows service status and mapped ports. |
 | `docker compose logs -f backend` | Streams backend container logs |
-| `docker compose logs -f frontend` | Streams frontend container logs |
 | `docker compose down` | Stops and removes containers/network. |
 | `docker compose down -v` | Same as down plus removes named volumes (destructive to DB data). |
