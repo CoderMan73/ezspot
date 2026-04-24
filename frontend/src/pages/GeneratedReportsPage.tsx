@@ -155,6 +155,13 @@ export default function GeneratedReportsPage() {
     };
 
     fetchReports();
+
+    // Listen for completion events from the GlobalUploadStatus component
+    window.addEventListener('report-processed', fetchReports);
+
+    return () => {
+      window.removeEventListener('report-processed', fetchReports);
+    };
   }, [currentUser]);
 
   const handlePageChange = (page: number) => {

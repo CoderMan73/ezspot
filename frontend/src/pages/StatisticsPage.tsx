@@ -45,6 +45,13 @@ export default function StatisticsPage() {
     useEffect(() => {
       if (currentUser) {
         fetchStatistics();
+
+        // Listen for completion events from the GlobalUploadStatus component
+        window.addEventListener('report-processed', fetchStatistics);
+
+        return () => {
+          window.removeEventListener('report-processed', fetchStatistics);
+        };
       }
     }, [currentUser]);
 
