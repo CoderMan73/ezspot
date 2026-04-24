@@ -279,6 +279,9 @@ def create_deans_list_docx_export(
         "ACADEMIC_YEAR_FULL": create_styled_rich_text(
             academic_year_full, font=FONT_BOOKMAN, bold=True, size_pt=SIZE_ACADEMIC_YEAR_FULL
         ),
+        "ACADEMIC_YEAR_FULL_PLAIN": create_styled_rich_text(
+            academic_year_full, font=FONT_ARIAL, bold=False, size_pt=SIZE_DEAN_INFO
+        ),
         "ACADEMIC_YEAR": create_styled_rich_text(
             academic_year_short, font=FONT_BOOKMAN, bold=True, size_pt=SIZE_DEAN_INFO
         ),

@@ -113,7 +113,7 @@ export default function DeansListModal({
                   name="dean_first_name"
                   value={formData.dean_first_name}
                   onChange={handleInputChange}
-                  placeholder="Keep placeholder"
+                  placeholder="e.g., Jane"
                   disabled={isLoading}
                 />
               </div>
@@ -125,7 +125,7 @@ export default function DeansListModal({
                   name="dean_last_name"
                   value={formData.dean_last_name}
                   onChange={handleInputChange}
-                  placeholder="Keep placeholder"
+                  placeholder="e.g., Doe"
                   disabled={isLoading}
                 />
               </div>
@@ -163,7 +163,7 @@ export default function DeansListModal({
                   name="contact_first_name"
                   value={formData.contact_first_name}
                   onChange={handleInputChange}
-                  placeholder="Keep placeholder"
+                  placeholder="e.g., John"
                   disabled={isLoading}
                 />
               </div>
@@ -175,7 +175,7 @@ export default function DeansListModal({
                   name="contact_last_name"
                   value={formData.contact_last_name}
                   onChange={handleInputChange}
-                  placeholder="Keep placeholder"
+                  placeholder="e.g., Doe"
                   disabled={isLoading}
                 />
               </div>
@@ -188,7 +188,7 @@ export default function DeansListModal({
                 name="contact_email"
                 value={formData.contact_email}
                 onChange={handleInputChange}
-                placeholder="Keep placeholder"
+                placeholder="e.g., pid@vt.edu"
                 disabled={isLoading}
               />
             </div>
