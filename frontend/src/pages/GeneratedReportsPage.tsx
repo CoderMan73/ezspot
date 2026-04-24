@@ -29,7 +29,6 @@ type SessionUser = {
 
 export default function GeneratedReportsPage() {
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('reports');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedAuthors, setExpandedAuthors] = useState<Set<string>>(new Set());
@@ -75,14 +74,24 @@ export default function GeneratedReportsPage() {
         if (response.status === 401 || !response.ok) {
           setCurrentUser(null);
           setLoading(false);
+          window.location.href = '/login'; 
           return;
         }
 
         const data = await response.json();
         setCurrentUser(data.user ?? null);
+
+        if (!data.user) {
+          setLoading(false);
+          window.location.href = '/login';
+          return;
+        }
+
       } catch {
         setCurrentUser(null);
-       }
+        setLoading(false);
+        window.location.href = '/login';
+      }
     };
 
     loadCurrentUser();
@@ -256,35 +265,40 @@ export default function GeneratedReportsPage() {
     <div className="home-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="logo">
-          <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+        <div className="sidebar-top">
+          <div className="logo">
+            <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+          </div>
+
+          <nav className="menu">
+            <button className="menu-item" onClick={() => navigate('/')}>
+              Home
+            </button>
+
+            <button className="menu-item" onClick={() => navigate('/statistics')}>
+              Statistics
+            </button>
+
+            <button className="menu-item active" onClick={() => navigate('/reports')}>
+              Generated Reports
+            </button>
+          </nav>
         </div>
-        <nav className="menu">
-          <button
-            className={`menu-item ${activeMenu === 'home' ? 'active' : ''}`}
-            onClick={() => navigate('/')}
-          >
-            Home
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'statistics' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('statistics')}
-          >
-            Statistics
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('reports')}
-          >
-            Generated Reports
-          </button>
-        </nav>
-        <CasAuthButton
-          mode={isAuthenticated ? 'logout' : 'login'}
-          onClick={handleAuthClick}
-          disabled={false}
-          className="login-btn"
-        />
+
+        <div className="sidebar-bottom">
+          {isAuthenticated && (
+            <div className="user-info">
+              Welcome, <strong>{currentUser?.pid}!</strong>
+            </div>
+          )}
+
+          <CasAuthButton
+            mode={isAuthenticated ? 'logout' : 'login'}
+            onClick={handleAuthClick}
+            disabled={false}
+            className="login-btn"
+          />
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -296,7 +310,7 @@ export default function GeneratedReportsPage() {
             <input
               type="text"
               className="search-input"
-              placeholder="Search"
+              placeholder="Search Report Name"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -373,38 +387,40 @@ export default function GeneratedReportsPage() {
         </div>
 
         {/* Pagination */}
-        <div className="pagination">
-          <button
-            className="pagination-btn"
-            disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
-          >
-            ← Previous
-          </button>
+        {filteredReports.length > 0 && (
+          <div className="pagination">
+            <button
+              className="pagination-btn"
+              disabled={currentPage === 1}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              ← Previous
+            </button>
 
-          <div className="page-numbers">
-            {getPageNumbers().map((page, index) => (
-              <button
-                key={index}
-                className={`page-number ${
-                  page === currentPage ? 'active' : ''
-                } ${typeof page !== 'number' ? 'ellipsis' : ''}`}
-                onClick={() => typeof page === 'number' && handlePageChange(page)}
-                disabled={typeof page !== 'number'}
-              >
-                {page}
-              </button>
-            ))}
+            <div className="page-numbers">
+              {getPageNumbers().map((page, index) => (
+                <button
+                  key={index}
+                  className={`page-number ${
+                    page === currentPage ? 'active' : ''
+                  } ${typeof page !== 'number' ? 'ellipsis' : ''}`}
+                  onClick={() => typeof page === 'number' && handlePageChange(page)}
+                  disabled={typeof page !== 'number'}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              className="pagination-btn"
+              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              Next →
+            </button>
           </div>
-
-          <button
-            className="pagination-btn"
-            disabled={currentPage === totalPages}
-            onClick={() => handlePageChange(currentPage + 1)}
-          >
-            Next →
-          </button>
-        </div>
+        )}
       </main>
     </div>
   );
