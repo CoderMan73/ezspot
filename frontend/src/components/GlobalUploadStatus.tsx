@@ -50,6 +50,9 @@ export default function GlobalUploadStatus() {
             setUploadStatus('success');
             setStatusMessage('Report processed successfully.');
             localStorage.removeItem('activeReportJob');
+            
+            // Notify other components that a report has finished processing
+            window.dispatchEvent(new CustomEvent('report-processed', { detail: { reportId } }));
 
             timeoutId = window.setTimeout(() => {
                 setStatusVisible(false);

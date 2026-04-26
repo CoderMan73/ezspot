@@ -25,6 +25,7 @@ spec:
         - name: container-0
           image: container.cs.vt.edu/anonymous/capsp26-coe-pdf-extraction-team-e-zspot/database:${IMAGE_TAG}
           imagePullPolicy: Always
+          args: ["--innodb-use-native-aio=0"]
           ports:
             - containerPort: 3306
               name: database

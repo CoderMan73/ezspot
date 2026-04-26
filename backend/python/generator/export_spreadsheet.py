@@ -81,6 +81,18 @@ def normalize_position_type(value):
     return normalized
 
 
+def safe_numeric(value):
+    """Attempts to convert a value to an integer for Excel, falling back to string if mixed."""
+    if value is None or value == "":
+        return ""
+    try:
+        # If it's purely digits, Excel should treat it as a number
+        return int(value)
+    except (ValueError, TypeError):
+        # Fallback to normalized uppercase string for codes like '4086H'
+        return str(value).strip().upper()
+
+
 def apply_base_font(worksheet, font_style=BASE_FONT):
     """Applies a base font style to all populated cells in a worksheet."""
 
@@ -177,8 +189,8 @@ def populate_prospective_sheet(worksheet, rows):
         worksheet.cell(row=current_row, column=3, value=classification if is_group_first_row else "")
         worksheet.cell(row=current_row, column=4, value=rank if is_group_first_row else "")
         worksheet.cell(row=current_row, column=5, value=subject)
-        worksheet.cell(row=current_row, column=6, value=course_number)
-        worksheet.cell(row=current_row, column=7, value=int(crn) if crn else "")
+        worksheet.cell(row=current_row, column=6, value=safe_numeric(course_number))
+        worksheet.cell(row=current_row, column=7, value=safe_numeric(crn))
         worksheet.cell(row=current_row, column=8, value=enrollment)
         worksheet.cell(row=current_row, column=9, value=rating)
         current_row += 1
@@ -197,7 +209,7 @@ def populate_prospective_sheet(worksheet, rows):
         header_cell.border = THIN_BORDER
 
     for row_index in range(2, worksheet.max_row + 1):
-        for column_index in (6, 7, 8, 9):
+        for column_index in (5, 6, 7, 8, 9):
             worksheet.cell(row=row_index, column=column_index).alignment = CENTER_ALIGNMENT
 
     for row_index in range(2, worksheet.max_row + 1):

@@ -12,10 +12,9 @@ type SessionUser = {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('home');
   const [showModal, setShowModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
+  const [isUploading, setIsUploading] = useState(false);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
   const isAuthenticated = useMemo(() => currentUser !== null, [currentUser])
 
@@ -32,35 +31,36 @@ export default function HomePage() {
   }
 
   async function loadCurrentUser() {
-
     try {
       const response = await fetch('/api/currentUser', {
         method: 'GET',
         credentials: 'include',
-      })
+      });
 
-      if (response.status === 401) {
-        setCurrentUser(null)
-        return
+      if (response.status === 401 || !response.ok) {
+        setCurrentUser(null);
+        window.location.href = '/login';
+        return;
       }
 
-      if (!response.ok) {
-        setCurrentUser(null)
-        return
-      }
-
-      const data = await response.json()
+      const data = await response.json();
       setCurrentUser(data.user ?? null);
+
+      if (!data.user) {
+        window.location.href = '/login';
+        return;
+      }
 
       if (data.user?.pid) {
         await fetch('/api/users/ensure-me', {
           method: 'POST',
           credentials: 'include',
         });
-}
+      }
     } catch {
-      setCurrentUser(null)
-    } 
+      setCurrentUser(null);
+      window.location.href = '/login';
+    }
   }
 
   const handleUploadClick = () => {
@@ -76,48 +76,47 @@ export default function HomePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedFile) {
-      console.log('File:', selectedFile);
+    if (!selectedFile || isUploading) return;
 
-      try {
-        const formData = new FormData();
-        formData.append('pdf', selectedFile);
+    // lock the upload button
+    setIsUploading(true);   
 
-        // send the upload request
-        // HARD CODED LOCAL PATH NEED TO CHANGE
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
-        });
+    try {
+      const formData = new FormData();
+      formData.append('pdf', selectedFile);
 
-        // handle error in request sending
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.message || 'Upload failed.');
-        }
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
 
-        // get response data
-        const uploadData = await uploadResponse.json();
-        const reportId = uploadData.report_id;
-
-        // save the active job so the global status component can track it
-        localStorage.setItem(
-          'activeReportJob',
-          JSON.stringify({
-            reportId,
-            filename: selectedFile.name,
-            status: 'Processing',
-          })
-        );
-
-        window.dispatchEvent(new Event('report-uploaded'));
-
-        setShowModal(false);
-        setSelectedFile(null);
-      } catch (err) {
-        console.error('Upload error:', err);
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.message || 'Upload failed.');
       }
+
+      const uploadData = await uploadResponse.json();
+      const reportId = uploadData.report_id;
+
+      localStorage.setItem(
+        'activeReportJob',
+        JSON.stringify({
+          reportId,
+          filename: selectedFile.name,
+          status: 'Processing',
+        })
+      );
+
+      window.dispatchEvent(new Event('report-uploaded'));
+
+      setShowModal(false);
+      setSelectedFile(null);
+
+    } catch (err) {
+      console.error('Upload error:', err);
+    } finally {
+      setIsUploading(false); 
     }
   };
 
@@ -136,35 +135,40 @@ export default function HomePage() {
     <div className="home-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="logo">
-          <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+        <div className="sidebar-top">
+          <div className="logo">
+            <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+          </div>
+
+          <nav className="menu">
+            <button className="menu-item active" onClick={() => navigate('/')}>
+              Home
+            </button>
+
+            <button className="menu-item" onClick={() => navigate('/statistics')}>
+              Statistics
+            </button>
+
+            <button className="menu-item" onClick={() => navigate('/reports')}>
+              Generated Reports
+            </button>
+          </nav>
         </div>
-        <nav className="menu">
-          <button
-            className={`menu-item ${activeMenu === 'home' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('home')}
-          >
-            Home
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'statistics' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('statistics')}
-          >
-            Statistics
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'reports' ? 'active' : ''}`}
-            onClick={() => navigate('/reports')}
-          >
-            Generated Reports
-          </button>
-        </nav>
-        <CasAuthButton
-          mode={isAuthenticated ? 'logout' : 'login'}
-          onClick={handleAuthClick}
-          disabled={false}
-          className='login-btn'
-        />
+
+        <div className="sidebar-bottom">
+          {isAuthenticated && (
+            <div className="user-info">
+              Welcome, <strong>{currentUser?.pid}!</strong>
+            </div>
+          )}
+
+          <CasAuthButton
+            mode={isAuthenticated ? 'logout' : 'login'}
+            onClick={handleAuthClick}
+            disabled={false}
+            className="login-btn"
+          />
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -177,8 +181,12 @@ export default function HomePage() {
             reports and generates filtered spreadsheets and formatted Word
             documents to support the Teaching Dean&apos;s List selection process.
           </p>
-          <button className="upload-btn" onClick={handleUploadClick}>
-            Upload SPOT Report
+          <button 
+            className="upload-btn" 
+            onClick={handleUploadClick}
+            disabled={isUploading}
+          >
+            {isUploading ? 'Processing...' : 'Upload SPOT Report'}
           </button>
         </div>
 
@@ -253,6 +261,7 @@ export default function HomePage() {
                   type="button"
                   className="custom-file-btn"
                   onClick={() => (window as any).fileInput?.click()}
+                  disabled={isUploading}
                 >
                   Choose File
                 </button>
@@ -260,7 +269,13 @@ export default function HomePage() {
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-cancel" onClick={handleCloseModal}>Cancel</button>
-                <button type="submit" className="btn-submit">Upload</button>
+                <button 
+                  type="submit" 
+                  className="btn-submit"
+                  disabled={isUploading}
+                >
+                  {isUploading ? 'Uploading...' : 'Upload'}
+                </button>
               </div>
             </form>
           </div>

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import vtLogo from '../assets/vt_logo.png';
-import '../styles/GeneratedReportsPage.css'; // Using similar styling
+import '../styles/StatisticsPage.css';
 import CasAuthButton from '../components/CasAuthButton';
 
 type StatisticsData = {
@@ -25,12 +25,12 @@ type Professor = {
 
 export default function StatisticsPage() {
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('statistics');
   const [data, setData] = useState<StatisticsData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const isAuthenticated = currentUser !== null;
+  const professorColorMap = useRef<Map<string, string>>(new Map());
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,10 +38,22 @@ export default function StatisticsPage() {
   const [selectedProfessors, setSelectedProfessors] = useState<Set<string>>(new Set());
   const [graphProfessors, setGraphProfessors] = useState<Professor[]>([]);
 
-  useEffect(() => {
-    loadCurrentUser();
-    fetchStatistics();
-  }, []);
+    useEffect(() => {
+      loadCurrentUser();
+    }, []);
+
+    useEffect(() => {
+      if (currentUser) {
+        fetchStatistics();
+
+        // Listen for completion events from the GlobalUploadStatus component
+        window.addEventListener('report-processed', fetchStatistics);
+
+        return () => {
+          window.removeEventListener('report-processed', fetchStatistics);
+        };
+      }
+    }, [currentUser]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -92,29 +104,53 @@ export default function StatisticsPage() {
     setGraphProfessors(profData);
   }, [selectedProfessors, data]);
 
-  const loadCurrentUser = async () => {
-    try {
-      const response = await fetch('/api/currentUser', {
-        method: 'GET',
-        credentials: 'include',
-      });
+    // get the constant color for each professors
+    const COLORS = [
+      '#861F41', 
+      '#E5751F', 
+      '#2F6F73',
+      '#4B5F8C', 
+      '#7A5C99', 
+      '#3F7D3A', 
+      '#A65E2E',
+      '#6B7280', 
+    ];
 
-      if (response.status === 401) {
-        setCurrentUser(null);
-        return;
+    function getColorForProfessor(name: string) {
+      if (!professorColorMap.current.has(name)) {
+        const colorIndex = professorColorMap.current.size % COLORS.length;
+        professorColorMap.current.set(name, COLORS[colorIndex]);
       }
 
-      if (!response.ok) {
-        setCurrentUser(null);
-        return;
-      }
-
-      const data = await response.json();
-      setCurrentUser(data.user ?? null);
-    } catch {
-      setCurrentUser(null);
+      return professorColorMap.current.get(name)!;
     }
-  };
+
+  const loadCurrentUser = async () => {
+      try {
+        const response = await fetch('/api/currentUser', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.status === 401 || !response.ok) {
+          setCurrentUser(null);
+          window.location.href = '/login';   
+          return;
+        }
+
+        const data = await response.json();
+        setCurrentUser(data.user ?? null);
+
+        if (!data.user) {
+          window.location.href = '/login';  
+          return;
+        }
+      } catch {
+        setCurrentUser(null);
+        window.location.href = '/login'; 
+        return
+      }
+    };
 
   const fetchStatistics = async () => {
     try {
@@ -192,7 +228,24 @@ export default function StatisticsPage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="home-container">
+        <aside className="sidebar">
+          <div className="sidebar-top">
+            <div className="logo">
+              <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+            </div>
+          </div>
+        </aside>
+
+        <main className="main-report-content">
+          <div className="reports-header">
+            <h1>Professor Ratings Statistics</h1>
+          </div>
+          <p>Loading statistics...</p>
+        </main>
+      </div>
+    );
   }
 
   if (error) {
@@ -203,41 +256,40 @@ export default function StatisticsPage() {
     <div className="home-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="logo">
-          <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+        <div className="sidebar-top">
+          <div className="logo">
+            <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+          </div>
+
+          <nav className="menu">
+            <button className="menu-item" onClick={() => navigate('/')}>
+              Home
+            </button>
+
+            <button className="menu-item active" onClick={() => navigate('/statistics')}>
+              Statistics
+            </button>
+
+            <button className="menu-item" onClick={() => navigate('/reports')}>
+              Generated Reports
+            </button>
+          </nav>
         </div>
-        <nav className="menu">
-          <button
-            className={`menu-item ${activeMenu === 'home' ? 'active' : ''}`}
-            onClick={() => navigate('/')}
-          >
-            Home
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'upload' ? 'active' : ''}`}
-            onClick={() => navigate('/upload')}
-          >
-            Upload
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'statistics' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('statistics')}
-          >
-            Statistics
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'reports' ? 'active' : ''}`}
-            onClick={() => navigate('/reports')}
-          >
-            Generated Reports
-          </button>
-        </nav>
-        <CasAuthButton
-          mode={isAuthenticated ? 'logout' : 'login'}
-          onClick={handleAuthClick}
-          disabled={false}
-          className="login-btn"
-        />
+
+        <div className="sidebar-bottom">
+          {isAuthenticated && (
+            <div className="user-info">
+              Welcome, <strong>{currentUser?.pid}!</strong>
+            </div>
+          )}
+
+          <CasAuthButton
+            mode={isAuthenticated ? 'logout' : 'login'}
+            onClick={handleAuthClick}
+            disabled={false}
+            className="login-btn"
+          />
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -248,18 +300,19 @@ export default function StatisticsPage() {
             <input
               type="text"
               className="search-input"
-              placeholder="Search professors"
+              placeholder="Search Professor Name"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="reports-list">
-          <table className="reports-table">
+        <div className="stats-list">
+          <div className="stats-table-scroll">
+            <table className="stats-table">
             <thead>
               <tr>
-                <th>Professor Name</th>
+                <th>All Professors</th>
               </tr>
             </thead>
             <tbody>
@@ -268,7 +321,7 @@ export default function StatisticsPage() {
                 return (
                   <tr
                     key={index}
-                    className={selectedProfessors.has(name) ? 'selected-row' : ''}
+                    className={selectedProfessors.has(name) ? 'stats-selected-row' : ''}
                     onClick={() => handleSelectProfessor(name)}
                     style={{ cursor: 'pointer' }}
                   >
@@ -278,44 +331,74 @@ export default function StatisticsPage() {
               })}
             </tbody>
           </table>
-
-          {/* Pagination */}
-          <div className="pagination">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </button>
-            <span>Page {currentPage} of {totalPages}</span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </button>
-          </div>
         </div>
 
+          {/* Pagination */}
+          {filteredProfessors.length > 0 && (
+            <div className="pagination">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+
+              <span>Page {currentPage} of {totalPages}</span>
+
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/** show current professors */}
+        {graphProfessors.length > 0 && (
+          <div className="selected-professors-bar">
+            {graphProfessors.map((prof) => (
+              <button
+                key={prof.name}
+                className="selected-professor-chip"
+                onClick={() => handleSelectProfessor(prof.name)}
+              >
+                {prof.name} ×
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Graph */}
-        <div style={{ marginTop: '20px' }}>
-          <h2>Professor Ratings Over Years</h2>
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              {graphProfessors.map((prof, index) => (
-                <Line
-                  key={prof.name}
-                  type="monotone"
-                  dataKey={prof.name}
-                  stroke={`hsl(${index * 137.5 % 360}, 70%, 50%)`}
-                />
-              ))}
-            </LineChart>
+        <div className="stats-chart-card">
+          <h2>Selected Professor Rating Trends</h2>
+          <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="year"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              allowDecimals={false}
+            />
+            <YAxis domain={[4, 6]} />
+            <Tooltip />
+            <Legend />
+
+            {graphProfessors.map((prof) => (
+            <Line
+              key={prof.name}
+              type="linear"
+              dataKey={prof.name}
+              stroke={getColorForProfessor(prof.name)}
+              strokeWidth={3}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+              connectNulls
+            />
+            ))}
+          </LineChart>
           </ResponsiveContainer>
         </div>
       </main>

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdArrowForward } from 'react-icons/md';
+import type { DeansListFormData } from '../components/DeansListModal';
 import vtLogo from '../assets/vt_logo.png';
 import '../styles/GeneratedReportsPage.css';
 import CasAuthButton from '../components/CasAuthButton';
+import DeansListModal from '../components/DeansListModal';
 
 
 interface Report {
@@ -29,11 +31,14 @@ type SessionUser = {
 
 export default function GeneratedReportsPage() {
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('reports');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedAuthors, setExpandedAuthors] = useState<Set<string>>(new Set());
   const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
+  const [deansListModalOpen, setDeansListModalOpen] = useState(false);
+  const [deansListModalReportId, setDeansListModalReportId] = useState<string | null>(null);
+  const [deansListModalReportName, setDeansListModalReportName] = useState<string | null>(null);
+  const [deansListGenerating, setDeansListGenerating] = useState(false);
   const itemsPerPage = 10;
 
   
@@ -75,14 +80,24 @@ export default function GeneratedReportsPage() {
         if (response.status === 401 || !response.ok) {
           setCurrentUser(null);
           setLoading(false);
+          window.location.href = '/login'; 
           return;
         }
 
         const data = await response.json();
         setCurrentUser(data.user ?? null);
+
+        if (!data.user) {
+          setLoading(false);
+          window.location.href = '/login';
+          return;
+        }
+
       } catch {
         setCurrentUser(null);
-       }
+        setLoading(false);
+        window.location.href = '/login';
+      }
     };
 
     loadCurrentUser();
@@ -140,6 +155,13 @@ export default function GeneratedReportsPage() {
     };
 
     fetchReports();
+
+    // Listen for completion events from the GlobalUploadStatus component
+    window.addEventListener('report-processed', fetchReports);
+
+    return () => {
+      window.removeEventListener('report-processed', fetchReports);
+    };
   }, [currentUser]);
 
   const handlePageChange = (page: number) => {
@@ -173,6 +195,10 @@ export default function GeneratedReportsPage() {
       return '/api/export/top30';
     }
 
+    if (docType === 'deans-list') {
+      return '/api/export/deans-list';
+    }
+
     return null;
   };
 
@@ -187,10 +213,22 @@ export default function GeneratedReportsPage() {
       return `${baseReportName}-top30.xlsx`;
     }
 
+    if (docType === 'deans-list') {
+      return `${baseReportName}-deans-list.docx`;
+    }
+
     return `${baseReportName}.xlsx`;
   };
 
   const handleDocumentDownload = async (reportId: string, reportName: string, docType: string) => {
+    // Special handling for Dean's List: open modal instead of immediate download
+    if (docType === 'deans-list') {
+      setDeansListModalReportId(reportId);
+      setDeansListModalReportName(reportName);
+      setDeansListModalOpen(true);
+      return;
+    }
+
     const endpoint = getExportEndpoint(docType);
 
     if (!endpoint) {
@@ -221,6 +259,46 @@ export default function GeneratedReportsPage() {
       console.error(`Failed to download ${docType} for report ${reportId}:`, error);
     } finally {
       setDownloadingDocument(null);
+    }
+  };
+
+  const handleDeansListGenerate = async (formData: DeansListFormData) => {
+    if (!deansListModalReportId) {
+      console.error('Report ID not set for Dean\'s List generation');
+      return;
+    }
+
+    setDeansListGenerating(true);
+
+    try {
+      const response = await fetch(`/api/export/deans-list?reportId=${encodeURIComponent(deansListModalReportId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          formData,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Generation failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = getDownloadFileName(deansListModalReportName || 'report', 'deans-list');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Failed to generate Dean\'s List:', error);
+      alert('Failed to generate Dean\'s List. Please try again.');
+    } finally {
+      setDeansListGenerating(false);
     }
   };
 
@@ -256,35 +334,40 @@ export default function GeneratedReportsPage() {
     <div className="home-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="logo">
-          <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+        <div className="sidebar-top">
+          <div className="logo">
+            <img src={vtLogo} alt="Virginia Tech Logo" className="logo-img" />
+          </div>
+
+          <nav className="menu">
+            <button className="menu-item" onClick={() => navigate('/')}>
+              Home
+            </button>
+
+            <button className="menu-item" onClick={() => navigate('/statistics')}>
+              Statistics
+            </button>
+
+            <button className="menu-item active" onClick={() => navigate('/reports')}>
+              Generated Reports
+            </button>
+          </nav>
         </div>
-        <nav className="menu">
-          <button
-            className={`menu-item ${activeMenu === 'home' ? 'active' : ''}`}
-            onClick={() => navigate('/')}
-          >
-            Home
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'statistics' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('statistics')}
-          >
-            Statistics
-          </button>
-          <button
-            className={`menu-item ${activeMenu === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveMenu('reports')}
-          >
-            Generated Reports
-          </button>
-        </nav>
-        <CasAuthButton
-          mode={isAuthenticated ? 'logout' : 'login'}
-          onClick={handleAuthClick}
-          disabled={false}
-          className="login-btn"
-        />
+
+        <div className="sidebar-bottom">
+          {isAuthenticated && (
+            <div className="user-info">
+              Welcome, <strong>{currentUser?.pid}!</strong>
+            </div>
+          )}
+
+          <CasAuthButton
+            mode={isAuthenticated ? 'logout' : 'login'}
+            onClick={handleAuthClick}
+            disabled={false}
+            className="login-btn"
+          />
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -296,7 +379,7 @@ export default function GeneratedReportsPage() {
             <input
               type="text"
               className="search-input"
-              placeholder="Search"
+              placeholder="Search Report Name"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -373,39 +456,54 @@ export default function GeneratedReportsPage() {
         </div>
 
         {/* Pagination */}
-        <div className="pagination">
-          <button
-            className="pagination-btn"
-            disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
-          >
-            ← Previous
-          </button>
+        {filteredReports.length > 0 && (
+          <div className="pagination">
+            <button
+              className="pagination-btn"
+              disabled={currentPage === 1}
+              onClick={() => handlePageChange(currentPage - 1)}
+            >
+              ← Previous
+            </button>
 
-          <div className="page-numbers">
-            {getPageNumbers().map((page, index) => (
-              <button
-                key={index}
-                className={`page-number ${
-                  page === currentPage ? 'active' : ''
-                } ${typeof page !== 'number' ? 'ellipsis' : ''}`}
-                onClick={() => typeof page === 'number' && handlePageChange(page)}
-                disabled={typeof page !== 'number'}
-              >
-                {page}
-              </button>
-            ))}
+            <div className="page-numbers">
+              {getPageNumbers().map((page, index) => (
+                <button
+                  key={index}
+                  className={`page-number ${
+                    page === currentPage ? 'active' : ''
+                  } ${typeof page !== 'number' ? 'ellipsis' : ''}`}
+                  onClick={() => typeof page === 'number' && handlePageChange(page)}
+                  disabled={typeof page !== 'number'}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              className="pagination-btn"
+              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(currentPage + 1)}
+            >
+              Next →
+            </button>
           </div>
-
-          <button
-            className="pagination-btn"
-            disabled={currentPage === totalPages}
-            onClick={() => handlePageChange(currentPage + 1)}
-          >
-            Next →
-          </button>
-        </div>
+        )}
       </main>
+
+      <DeansListModal
+        isOpen={deansListModalOpen}
+        reportId={deansListModalReportId || ''}
+        reportName={deansListModalReportName || ''}
+        onClose={() => {
+          setDeansListModalOpen(false);
+          setDeansListModalReportId(null);
+          setDeansListModalReportName(null);
+        }}
+        onGenerate={handleDeansListGenerate}
+        isLoading={deansListGenerating}
+      />
     </div>
   );
 }
