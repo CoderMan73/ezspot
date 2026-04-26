@@ -218,11 +218,11 @@
 }
 
 .selected-row {
-  background-color: #e0f2fe !important; /* Light blue background for selected rows */
+  background-color: #e0f2fe !important; 
 }
 
 .selected-row:hover {
-  background-color: #bae6fd !important; /* Slightly darker on hover */
+  background-color: #bae6fd !important; 
 }
 
 .row-author-cell {
