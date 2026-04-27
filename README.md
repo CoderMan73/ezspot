@@ -37,4 +37,4 @@ To stop the services:
 - [Auth & CAS Guide](docs/Auth.md)
 - [Environment Variables Guide](docs/EnvironmentGuide.md)
 - [Document Generation Guide (Excel & Word)](docs/DocumentGeneration.md)
-- [PDF Parser (pymupdf))](https://pymupdf.readthedocs.io/en/latest/)
+- [PDF Parser (PyMuPDF)](https://github.com/pymupdf/pymupdf)
